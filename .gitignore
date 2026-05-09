@@ -1,12 +1,22 @@
-node_modules/
-.env
-.env.local
-dist/
-build/
-*.log
-.DS_Store
+# Rust build artifacts
+target/
+**/*.rs.bk
+
+# Editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 ~*
+
+# Binary artifacts — never commit these
+*.exe
+*.zip
+*.msi
+
+# Secrets
+.env
+.env.local
+
+# Claude Code local settings
+.claude/settings.local.json
