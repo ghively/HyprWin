@@ -1,0 +1,70 @@
+[package]
+name = "hyprtile"
+version = "0.1.0"
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["HyprTile Contributors"]
+description = "A Hyprland-inspired tiling window manager for Windows"
+build = "build.rs"
+
+[[bin]]
+name = "hyprtile"
+path = "src/main.rs"
+
+[lib]
+name = "hyprtile"
+path = "src/lib.rs"
+
+[dependencies]
+windows = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Performance",
+    "Win32_System_Threading",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_WindowsProgramming",
+    "Win32_Security",
+    "Win32_System_Pipes",
+    "Win32_Storage_FileSystem",
+    "Win32_System_SystemServices",
+    "Win32_System_Registry",
+] }
+tokio = { version = "1.44", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+notify = "7.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+clap = { version = "4.5", features = ["derive"] }
+thiserror = "2.0"
+anyhow = "1.0"
+regex = "1.11"
+chrono = "0.4"
+tokio-util = { version = "0.7", features = ["codec"] }
+bytes = "1.10"
+tray-icon = "0.19"
+global-hotkey = "0.6"
+
+[dev-dependencies]
+mockall = "0.13"
+tempfile = "3.19"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[[test]]
+name = "integration_tests"
+path = "tests/integration_tests.rs"
