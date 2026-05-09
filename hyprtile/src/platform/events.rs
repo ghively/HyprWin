@@ -1,8 +1,7 @@
 use std::sync::Mutex;
 use std::sync::mpsc::Sender;
-use std::thread;
 use std::time::Instant;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, info, trace, warn};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Accessibility::{
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -165,16 +164,13 @@ pub fn classify_event(event: u32, hwnd: HWND) -> Option<WindowEvent> {
         EVENT_SYSTEM_MINIMIZEEND => Some(WindowEvent::WindowRestored(window_id)),
         EVENT_SYSTEM_MOVESIZESTART => Some(WindowEvent::WindowMoved(window_id)),
         EVENT_SYSTEM_MOVESIZEEND => Some(WindowEvent::WindowResized(window_id)),
-        EVENT_OBJECT_LOCATIONCHANGE => {
-            unsafe {
-                if GetForegroundWindow() == hwnd {
-                    // Could be a focus change or just a move
-                    Some(WindowEvent::WindowMoved(window_id))
-                } else {
-                    Some(WindowEvent::WindowMoved(window_id))
-                }
+        EVENT_OBJECT_LOCATIONCHANGE => unsafe {
+            if GetForegroundWindow() == hwnd {
+                Some(WindowEvent::WindowFocused(window_id))
+            } else {
+                Some(WindowEvent::WindowMoved(window_id))
             }
-        }
+        },
         EVENT_OBJECT_NAMECHANGE => Some(WindowEvent::WindowRenamed(window_id)),
         EVENT_OBJECT_FOCUS => Some(WindowEvent::WindowFocused(WindowId(hwnd.0 as isize))),
         // Handle focus events that may come through as locationchange
@@ -186,71 +182,6 @@ pub fn classify_event(event: u32, hwnd: HWND) -> Option<WindowEvent> {
             None
         }
     }
-}
-
-/// Start the event processing loop in its own thread.
-///
-/// This creates a hidden message window and runs a standard `GetMessage` loop.
-/// The OS delivers WinEventHook callbacks on this thread, and we also receive
-/// `WM_DISPLAYCHANGE` / `WM_DPICHANGED` messages here.
-pub fn start_event_loop(event_tx: Sender<WindowEvent>) -> anyhow::Result<()> {
-    let tx = event_tx.clone();
-
-    thread::Builder::new()
-        .name("hyprtile-events".to_string())
-        .spawn(move || {
-            info!("Event processing loop started");
-
-            unsafe {
-                // Create a message-only window
-                let hwnd = match CreateWindowExW(
-                    WS_EX_NOACTIVATE,
-                    windows::core::w!("Message"),
-                    None,
-                    WS_OVERLAPPED,
-                    0,
-                    0,
-                    0,
-                    0,
-                    Some(HWND_MESSAGE),
-                    None,
-                    None,
-                    None,
-                ) {
-                    Ok(h) => h,
-                    Err(e) => {
-                        error!("Failed to create event loop message window: {}", e);
-                        return;
-                    }
-                };
-
-                // Store hwnd for later use
-                debug!("Event loop message window created: {:?}", hwnd);
-
-                // Message loop
-                let mut msg = MSG::default();
-                while GetMessageW(&mut msg, Some(HWND(std::ptr::null_mut())), 0, 0).as_bool() {
-                    let _ = TranslateMessage(&msg);
-                    DispatchMessageW(&msg);
-
-                    // Handle display change
-                    if msg.message == WM_DISPLAYCHANGE {
-                        info!("WM_DISPLAYCHANGE received — monitor configuration changed");
-                        let _ = tx.send(WindowEvent::MonitorChanged);
-                    }
-
-                    // Handle DPI change
-                    if msg.message == WM_DPICHANGED {
-                        info!("WM_DPICHANGED received — DPI changed");
-                        let _ = tx.send(WindowEvent::DpiChanged);
-                    }
-                }
-
-                info!("Event processing loop exiting");
-            }
-        })?;
-
-    Ok(())
 }
 
 /// Debounce rapid sequences of events (e.g. rapid focus changes during

@@ -15,7 +15,8 @@ use tracing::trace;
 // To modify master behavior:
 //   1. MasterStackConfig controls master_count, master_width_factor, orientation.
 //   2. master_width_factor is in (0.1, 0.9) — clamped in the caller.
-//   3. Remainder pixels from division are given to the last window slot.
+//   3. Remainder pixels are distributed one-per-slot via slot_extent() so
+//      no single window absorbs the entire division remainder.
 //   4. Orientation::Vertical puts master on top, stack on bottom.
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -114,32 +115,29 @@ impl MasterStackLayout {
 
                 // Master windows: split vertically (top to bottom).
                 if master_count > 0 {
-                    let master_slot_height = master_region.height / master_count as i32;
                     for (i, &win) in windows.iter().enumerate().take(master_count) {
-                        let my = master_region.y + master_slot_height * i as i32;
-                        let mh = if i == master_count - 1 {
-                            // Last window gets remaining height
-                            master_region.y + master_region.height - my
-                        } else {
-                            master_slot_height
-                        };
-                        let win_rect = Rect::new(master_region.x, my, master_region.width, mh);
+                        let (off, len) = slot_extent(master_region.height, master_count, i);
+                        let win_rect = Rect::new(
+                            master_region.x,
+                            master_region.y + off,
+                            master_region.width,
+                            len,
+                        );
                         results.push((win, apply_gaps(&win_rect, gap)));
                     }
                 }
 
                 // Stack windows: split vertically (top to bottom).
                 if stack_count > 0 {
-                    let stack_slot_height = stack_region.height / stack_count as i32;
                     for i in 0..stack_count {
                         let si = i + master_count;
-                        let sy = stack_region.y + stack_slot_height * i as i32;
-                        let sh = if i == stack_count - 1 {
-                            stack_region.y + stack_region.height - sy
-                        } else {
-                            stack_slot_height
-                        };
-                        let win_rect = Rect::new(stack_region.x, sy, stack_region.width, sh);
+                        let (off, len) = slot_extent(stack_region.height, stack_count, i);
+                        let win_rect = Rect::new(
+                            stack_region.x,
+                            stack_region.y + off,
+                            stack_region.width,
+                            len,
+                        );
                         results.push((windows[si], apply_gaps(&win_rect, gap)));
                     }
                 }
@@ -166,31 +164,29 @@ impl MasterStackLayout {
 
                 // Master windows: split horizontally (left to right).
                 if master_count > 0 {
-                    let master_slot_width = master_region.width / master_count as i32;
                     for (i, &win) in windows.iter().enumerate().take(master_count) {
-                        let mx = master_region.x + master_slot_width * i as i32;
-                        let mw = if i == master_count - 1 {
-                            master_region.x + master_region.width - mx
-                        } else {
-                            master_slot_width
-                        };
-                        let win_rect = Rect::new(mx, master_region.y, mw, master_region.height);
+                        let (off, len) = slot_extent(master_region.width, master_count, i);
+                        let win_rect = Rect::new(
+                            master_region.x + off,
+                            master_region.y,
+                            len,
+                            master_region.height,
+                        );
                         results.push((win, apply_gaps(&win_rect, gap)));
                     }
                 }
 
                 // Stack windows: split horizontally (left to right).
                 if stack_count > 0 {
-                    let stack_slot_width = stack_region.width / stack_count as i32;
                     for i in 0..stack_count {
                         let si = i + master_count;
-                        let sx = stack_region.x + stack_slot_width * i as i32;
-                        let sw = if i == stack_count - 1 {
-                            stack_region.x + stack_region.width - sx
-                        } else {
-                            stack_slot_width
-                        };
-                        let win_rect = Rect::new(sx, stack_region.y, sw, stack_region.height);
+                        let (off, len) = slot_extent(stack_region.width, stack_count, i);
+                        let win_rect = Rect::new(
+                            stack_region.x + off,
+                            stack_region.y,
+                            len,
+                            stack_region.height,
+                        );
                         results.push((windows[si], apply_gaps(&win_rect, gap)));
                     }
                 }
@@ -202,6 +198,46 @@ impl MasterStackLayout {
             master_count, stack_count, "master_stack layout calculated"
         );
         results
+    }
+}
+
+/// Compute the (offset, length) of slot `index` when splitting `total`
+/// pixels into `count` slots. Distributes the remainder one pixel at a
+/// time across the first `total % count` slots, so layouts add up exactly
+/// to `total` without giving the last slot an oversized share.
+#[inline]
+fn slot_extent(total: i32, count: usize, index: usize) -> (i32, i32) {
+    debug_assert!(index < count);
+    let count_i = count as i32;
+    let base = total / count_i;
+    let remainder = total - base * count_i;
+    let extra_before = (index as i32).min(remainder);
+    let extra_here = if (index as i32) < remainder { 1 } else { 0 };
+    let offset = base * index as i32 + extra_before;
+    let length = base + extra_here;
+    (offset, length)
+}
+
+#[cfg(test)]
+mod slot_tests {
+    use super::slot_extent;
+
+    #[test]
+    fn slot_extent_partitions_exactly() {
+        for total in [10, 11, 100, 101, 1023, 1080] {
+            for count in 1usize..=8 {
+                let mut sum = 0;
+                let mut last_end = 0;
+                for i in 0..count {
+                    let (off, len) = slot_extent(total, count, i);
+                    assert_eq!(off, last_end, "offsets must be contiguous");
+                    assert!(len >= 1 || total == 0, "slot length must be positive");
+                    sum += len;
+                    last_end = off + len;
+                }
+                assert_eq!(sum, total, "slots must sum to total");
+            }
+        }
     }
 }
 
@@ -256,7 +292,7 @@ mod tests {
     #[test]
     fn test_master_stack_multiple_masters() {
         let workspace = Rect::new(0, 0, 1000, 600);
-        let windows: Vec<WindowId> = (1..=5).map(|n| wid(n)).collect();
+        let windows: Vec<WindowId> = (1..=5).map(wid).collect();
         let config = MasterStackConfig {
             master_count: 2,
             master_width_factor: 0.5,

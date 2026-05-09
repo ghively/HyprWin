@@ -612,19 +612,19 @@ fn test_parse_default_config() {
 
     // Verify general settings
     assert_eq!(config.general.terminal, "wezterm.exe");
-    assert_eq!(config.general.resize_on_border, true);
-    assert_eq!(config.general.auto_start, false);
-    assert_eq!(config.general.focus_follows_mouse, false);
+    assert!(config.general.resize_on_border);
+    assert!(!config.general.auto_start);
+    assert!(!config.general.focus_follows_mouse);
     assert_eq!(config.general.resize_border_width, 8);
 
     // Verify gaps
     assert_eq!(config.gaps.inner, 8);
     assert_eq!(config.gaps.outer, 8);
-    assert_eq!(config.gaps.smart, true);
+    assert!(config.gaps.smart);
 
     // Verify workspaces
     assert_eq!(config.workspaces.count, 10);
-    assert_eq!(config.workspaces.per_monitor, true);
+    assert!(config.workspaces.per_monitor);
 
     // Verify default keybinds exist
     assert!(config.keybinds.contains_key("mod+RETURN"));
@@ -667,7 +667,7 @@ action = "float"
     assert_eq!(config.general.terminal, "alacritty.exe");
     assert_eq!(config.gaps.inner, 15);
     assert_eq!(config.gaps.outer, 12);
-    assert_eq!(config.gaps.smart, false);
+    assert!(!config.gaps.smart);
     assert_eq!(config.workspaces.count, 5);
     assert_eq!(config.window_rules.len(), 1);
     assert_eq!(

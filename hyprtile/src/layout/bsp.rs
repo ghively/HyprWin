@@ -447,7 +447,7 @@ mod tests {
 
     #[test]
     fn test_dwindle_five_windows() {
-        let windows: Vec<WindowId> = (1..=5).map(|n| wid(n)).collect();
+        let windows: Vec<WindowId> = (1..=5).map(wid).collect();
         let tree = build_dwindle_tree(&windows);
         assert_eq!(tree.window_count(), 5);
         for i in 1..=5 {

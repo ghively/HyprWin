@@ -76,8 +76,8 @@ impl Rect {
         Rect {
             x: self.x + amount,
             y: self.y + amount,
-            width: (self.width - 2 * amount).max(0),
-            height: (self.height - 2 * amount).max(0),
+            width: (self.width - 2 * amount).max(1),
+            height: (self.height - 2 * amount).max(1),
         }
     }
 

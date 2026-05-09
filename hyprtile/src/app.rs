@@ -374,11 +374,13 @@ impl App {
                         .find(|m| m.contains_window(window_id.0))
                         .map(|m| m.id)
                         .unwrap_or_else(|| {
-                            // Fallback to primary or first monitor
+                            // Fallback to primary, then to the first known monitor.
+                            // Never default to a hardcoded id (monitor counters start at 1).
                             state
                                 .monitors
                                 .iter()
                                 .find(|m| m.is_primary)
+                                .or_else(|| state.monitors.first())
                                 .map(|m| m.id)
                                 .unwrap_or(0)
                         });
