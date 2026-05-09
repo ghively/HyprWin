@@ -43,8 +43,9 @@ use std::time::Duration;
 use tokio::sync::Notify;
 use tracing::{debug, error, info, warn};
 use windows::Win32::Foundation::{LPARAM, WPARAM};
+use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetCurrentThreadId, HWND_TOP, PostThreadMessageW, SWP_FRAMECHANGED, SWP_NOACTIVATE,
+    HWND_TOP, PostThreadMessageW, SWP_FRAMECHANGED, SWP_NOACTIVATE,
     SWP_NOCOPYBITS, SWP_SHOWWINDOW, WM_QUIT,
 };
 
@@ -444,10 +445,18 @@ impl App {
         // Clone the sender for the event hook thread
         let event_tx_for_hook = self.event_tx.clone();
 
+        // Shared Win32 thread ID for the hook thread so we can post WM_QUIT on shutdown
+        let hook_thread_id = Arc::new(std::sync::atomic::AtomicU32::new(0));
+        let hook_thread_id_inner = Arc::clone(&hook_thread_id);
+
         // 1. Start WinEventHook thread
         let hook_handle = std::thread::Builder::new()
             .name("event-hook".to_string())
             .spawn(move || {
+                // Store this thread's Win32 ID so the main thread can post WM_QUIT
+                unsafe {
+                    hook_thread_id_inner.store(GetCurrentThreadId(), std::sync::atomic::Ordering::SeqCst);
+                }
                 match EventHook::register(event_tx_for_hook) {
                     Ok(hook) => {
                         info!("WinEventHook registered");
@@ -574,6 +583,14 @@ impl App {
         // 5. Graceful shutdown: signal threads to stop and join them
         hotkey_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
         self.state.tcp_shutdown.notify_waiters();
+
+        // Signal the hook thread to exit by posting WM_QUIT to its Win32 message queue
+        let hook_tid = hook_thread_id.load(std::sync::atomic::Ordering::SeqCst);
+        if hook_tid != 0 {
+            unsafe {
+                let _ = PostThreadMessageW(hook_tid, WM_QUIT, WPARAM(0), LPARAM(0));
+            }
+        }
 
         // Join worker threads with a timeout to avoid hanging forever
         let join_timeout = Duration::from_secs(2);
