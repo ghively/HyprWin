@@ -115,12 +115,8 @@ fn handle_focused_window(state: &AppState) -> IpcResponse {
 
 /// Return the current layout and available layouts.
 fn handle_layout(monitor: Option<u32>, state: &AppState) -> IpcResponse {
-    let monitor_id = monitor.unwrap_or_else(|| {
-        state
-            .get_focused_monitor()
-            .map(|m| m.id)
-            .unwrap_or(0)
-    });
+    let monitor_id =
+        monitor.unwrap_or_else(|| state.get_focused_monitor().map(|m| m.id).unwrap_or(0));
 
     let layout_name = state
         .workspace_manager
@@ -223,7 +219,9 @@ fn handle_move_direction(direction: &str, state: &mut AppState) -> IpcResponse {
 
             let a_dist = directional_distance(current_center, a_center, &dir);
             let b_dist = directional_distance(current_center, b_center, &dir);
-            a_dist.partial_cmp(&b_dist).unwrap_or(std::cmp::Ordering::Equal)
+            a_dist
+                .partial_cmp(&b_dist)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
         .cloned();
 
@@ -296,9 +294,7 @@ fn directional_distance(from: (i32, i32), to: (i32, i32), dir: &FocusDirection) 
                 dx.abs() + dy * 2.0
             }
         }
-        FocusDirection::Next | FocusDirection::Previous => {
-            (dx * dx + dy * dy).sqrt()
-        }
+        FocusDirection::Next | FocusDirection::Previous => (dx * dx + dy * dy).sqrt(),
     }
 }
 
@@ -370,10 +366,7 @@ fn handle_toggle_fullscreen(state: &mut AppState) -> IpcResponse {
 
 /// Cycle to the next layout on the focused monitor's active workspace.
 fn handle_cycle_layout(state: &mut AppState) -> IpcResponse {
-    let monitor_id = state
-        .get_focused_monitor()
-        .map(|m| m.id)
-        .unwrap_or(0);
+    let monitor_id = state.get_focused_monitor().map(|m| m.id).unwrap_or(0);
 
     if let Some(ws) = state.workspace_manager.get_active_workspace_mut(monitor_id) {
         let new_layout = ws.layout_engine.cycle();
@@ -392,10 +385,7 @@ fn handle_cycle_layout(state: &mut AppState) -> IpcResponse {
 
 /// Switch the focused monitor to the given workspace.
 fn handle_switch_workspace(id: u32, state: &mut AppState) -> IpcResponse {
-    let monitor_id = state
-        .get_focused_monitor()
-        .map(|m| m.id)
-        .unwrap_or(0);
+    let monitor_id = state.get_focused_monitor().map(|m| m.id).unwrap_or(0);
 
     if let Err(e) = state.workspace_manager.switch_workspace(monitor_id, id) {
         return IpcResponse::error(format!("Failed to switch workspace: {}", e));

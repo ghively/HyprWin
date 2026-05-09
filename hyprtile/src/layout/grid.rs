@@ -4,9 +4,9 @@
 //! The grid dimensions are chosen to keep the layout as close to a
 //! square as possible, minimising wasted space.
 
+use super::gaps::apply_gaps;
 use crate::platform::window::WindowId;
 use crate::util::rect::Rect;
-use super::gaps::apply_gaps;
 use tracing::trace;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -90,9 +90,7 @@ impl GridLayout {
 
         trace!(
             window_count = results.len(),
-            rows,
-            cols,
-            "grid layout calculated"
+            rows, cols, "grid layout calculated"
         );
         results
     }
@@ -211,12 +209,14 @@ mod tests {
             assert!(
                 rect.width > 0,
                 "window {} has non-positive width: {:?}",
-                i, rect
+                i,
+                rect
             );
             assert!(
                 rect.height > 0,
                 "window {} has non-positive height: {:?}",
-                i, rect
+                i,
+                rect
             );
         }
     }

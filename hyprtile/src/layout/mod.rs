@@ -14,10 +14,10 @@
 
 pub mod bsp;
 pub mod dwindle;
+pub mod gaps;
+pub mod grid;
 pub mod master_stack;
 pub mod monocle;
-pub mod grid;
-pub mod gaps;
 
 use crate::config::types::GapsConfig;
 use crate::platform::window::WindowId;
@@ -122,11 +122,7 @@ pub fn calculate_layout(
     let inner = gaps.inner as i32;
     let outer = gaps.outer as i32;
 
-    debug!(
-        ?layout,
-        window_count = windows.len(),
-        "calculating layout"
-    );
+    debug!(?layout, window_count = windows.len(), "calculating layout");
 
     match layout {
         LayoutType::Dwindle => {
@@ -144,16 +140,14 @@ pub fn calculate_layout(
                 &config,
             )
         }
-        LayoutType::Monocle => {
-            monocle::MonocleLayout::calculate(
-                windows,
-                workspace_rect,
-                inner,
-                outer,
-                gaps.smart,
-                focused_idx,
-            )
-        }
+        LayoutType::Monocle => monocle::MonocleLayout::calculate(
+            windows,
+            workspace_rect,
+            inner,
+            outer,
+            gaps.smart,
+            focused_idx,
+        ),
         LayoutType::Grid => {
             grid::GridLayout::calculate(windows, workspace_rect, inner, outer, gaps.smart)
         }
@@ -276,10 +270,7 @@ mod tests {
             LayoutType::from_name("master_stack"),
             Some(LayoutType::MasterStack)
         );
-        assert_eq!(
-            LayoutType::from_name("monocle"),
-            Some(LayoutType::Monocle)
-        );
+        assert_eq!(LayoutType::from_name("monocle"), Some(LayoutType::Monocle));
         assert_eq!(LayoutType::from_name("grid"), Some(LayoutType::Grid));
         assert_eq!(LayoutType::from_name("unknown"), None);
     }

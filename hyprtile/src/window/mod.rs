@@ -65,7 +65,10 @@ impl WindowManager {
     /// the window should not be managed (fails the filter checks).
     pub fn register_window(&mut self, hwnd: WindowId) -> Option<&Window> {
         if !filter::should_manage(hwnd) {
-            debug!("Window {} failed management filter, skipping", hwnd.as_raw().0);
+            debug!(
+                "Window {} failed management filter, skipping",
+                hwnd.as_raw().0
+            );
             return None;
         }
 
@@ -79,7 +82,11 @@ impl WindowManager {
 
         debug!(
             "Registered window {} (class='{}', title='{}', state={:?}, managed={})",
-            hwnd.as_raw().0, window.class_name, window.title, window.state, window.is_managed
+            hwnd.as_raw().0,
+            window.class_name,
+            window.title,
+            window.state,
+            window.is_managed
         );
 
         self.windows.insert(hwnd, window);
@@ -177,7 +184,10 @@ impl WindowManager {
             window.refresh_info();
             debug!(
                 "Refreshed window {}: class='{}' title='{}' process='{}'",
-                hwnd.as_raw().0, window.class_name, window.title, window.process_name
+                hwnd.as_raw().0,
+                window.class_name,
+                window.title,
+                window.process_name
             );
         }
     }
@@ -241,7 +251,8 @@ impl WindowManager {
         let new_state = window.toggle_float();
         info!(
             "Toggled float for window {} -> {:?}",
-            hwnd.as_raw().0, new_state
+            hwnd.as_raw().0,
+            new_state
         );
         Some(new_state)
     }
@@ -254,7 +265,8 @@ impl WindowManager {
         let new_state = window.toggle_fullscreen();
         info!(
             "Toggled fullscreen for window {} -> {:?}",
-            hwnd.as_raw().0, new_state
+            hwnd.as_raw().0,
+            new_state
         );
         Some(new_state)
     }
@@ -294,7 +306,9 @@ impl WindowManager {
             if window.state != old_state {
                 debug!(
                     "Window {} state changed from {:?} to {:?} after rule reload",
-                    window.id.as_raw().0, old_state, window.state
+                    window.id.as_raw().0,
+                    old_state,
+                    window.state
                 );
             }
         }

@@ -147,7 +147,9 @@ impl HotkeyManager {
         let id = wparam.0 as u32;
         let hk = self.hotkeys.get(&id);
         if hk.is_some() {
-            if let Some(action) = hk.as_ref().map(|h| h.action.as_str()) { trace!("Hotkey triggered: id={} action={}", id, action); }
+            if let Some(action) = hk.as_ref().map(|h| h.action.as_str()) {
+                trace!("Hotkey triggered: id={} action={}", id, action);
+            }
         }
         hk
     }
@@ -402,7 +404,10 @@ pub fn register_all_hotkeys(
 
     let total = keybinds.len();
     let success = total - failed;
-    info!("Registered {}/{} hotkeys ({} failed)", success, total, failed);
+    info!(
+        "Registered {}/{} hotkeys ({} failed)",
+        success, total, failed
+    );
 
     if failed == total && total > 0 {
         anyhow::bail!("All {} hotkey registrations failed", total);
@@ -437,7 +442,10 @@ pub fn run_message_loop(hotkey_tx: Sender<String>) -> anyhow::Result<()> {
             windows::w!("Message"),
             None,
             WS_OVERLAPPED,
-            0, 0, 0, 0,
+            0,
+            0,
+            0,
+            0,
             HWND_MESSAGE,
             None,
             None,

@@ -2,7 +2,9 @@ use std::mem;
 use std::path::Path;
 use tracing::{debug, trace, warn};
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE};
-use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS, DWM_CLOAKED_SHELL};
+use windows::Win32::Graphics::Dwm::{
+    DWM_CLOAKED_SHELL, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS, DwmGetWindowAttribute,
+};
 use windows::Win32::System::Threading::GetProcessImageFileNameW;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
@@ -199,12 +201,8 @@ pub fn is_window_cloaked(hwnd: HWND) -> bool {
     let mut cloaked: u32 = 0;
     let size = mem::size_of::<u32>() as u32;
     unsafe {
-        let result = DwmGetWindowAttribute(
-            hwnd,
-            DWMWA_CLOAKED,
-            &mut cloaked as *mut _ as *mut _,
-            size,
-        );
+        let result =
+            DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, &mut cloaked as *mut _ as *mut _, size);
         if result.is_err() {
             return false;
         }
@@ -338,7 +336,16 @@ impl DeferredPositioner {
         );
 
         unsafe {
-            let new_hdwp = DeferWindowPos(hdwp, hwnd, HWND(0), rect.x, rect.y, rect.width, rect.height, flags_to_use);
+            let new_hdwp = DeferWindowPos(
+                hdwp,
+                hwnd,
+                HWND(0),
+                rect.x,
+                rect.y,
+                rect.width,
+                rect.height,
+                flags_to_use,
+            );
             if new_hdwp.is_invalid() {
                 warn!("DeferWindowPos failed for hwnd={:?}", hwnd);
                 self.hdwp = None;
@@ -409,7 +416,14 @@ pub fn remove_thick_frame(hwnd: HWND) {
     }
 
     let style = get_window_style(hwnd);
-    let new_style = WINDOW_STYLE(style.0 & !(WS_THICKFRAME.0 | WS_CAPTION.0 | WS_SYSMENU.0 | WS_MAXIMIZEBOX.0 | WS_MINIMIZEBOX.0));
+    let new_style = WINDOW_STYLE(
+        style.0
+            & !(WS_THICKFRAME.0
+                | WS_CAPTION.0
+                | WS_SYSMENU.0
+                | WS_MAXIMIZEBOX.0
+                | WS_MINIMIZEBOX.0),
+    );
     set_window_style(hwnd, new_style);
 
     unsafe {
@@ -439,7 +453,14 @@ pub fn restore_thick_frame(hwnd: HWND) {
     }
 
     let style = get_window_style(hwnd);
-    let new_style = WINDOW_STYLE(style.0 | WS_THICKFRAME.0 | WS_CAPTION.0 | WS_SYSMENU.0 | WS_MAXIMIZEBOX.0 | WS_MINIMIZEBOX.0);
+    let new_style = WINDOW_STYLE(
+        style.0
+            | WS_THICKFRAME.0
+            | WS_CAPTION.0
+            | WS_SYSMENU.0
+            | WS_MAXIMIZEBOX.0
+            | WS_MINIMIZEBOX.0,
+    );
     set_window_style(hwnd, new_style);
 
     unsafe {
@@ -590,7 +611,9 @@ fn get_window_process_name(hwnd: HWND) -> String {
     }
 
     use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::System::Threading::{GetWindowThreadProcessId, OpenProcess, PROCESS_QUERY_INFORMATION};
+    use windows::Win32::System::Threading::{
+        GetWindowThreadProcessId, OpenProcess, PROCESS_QUERY_INFORMATION,
+    };
 
     let mut pid = 0u32;
     unsafe {

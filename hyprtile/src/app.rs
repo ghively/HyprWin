@@ -4,43 +4,48 @@
 //! and IPC handlers.  [`App`] wraps it with the Win32 event loop, hotkey
 //! dispatch, and layout application.
 
-use crate::config::types::Config;
 use crate::config::ConfigManager;
+use crate::config::types::Config;
 use crate::layout::gaps::effective_gaps;
-use crate::layout::{calculate_layout, LayoutType};
-use crate::platform::dwm::{set_border_color, BorderColors};
+use crate::layout::{LayoutType, calculate_layout};
+use crate::platform::dwm::{BorderColors, set_border_color};
 use crate::platform::events::{EventHook, WindowEvent};
 use crate::platform::input::{HotkeyManager, register_all_hotkeys};
-use crate::platform::monitor::{enumerate_monitors, set_dpi_awareness, Monitor};
+use crate::platform::monitor::{Monitor, enumerate_monitors, set_dpi_awareness};
 use crate::platform::window::{
-// ═══════════════════════════════════════════════════════════════════════════════
-// AI_AGENT_STOP: APP_COORDINATOR — This is the central event dispatch loop.
-// Before modifying event handling:
-//   1. All events flow through process_event() — add new cases there.
-//   2. handle_hotkey() dispatches all user actions — add new action strings.
-//   3. apply_layout() is called after every state change — keep it fast.
-//   4. Thread spawning/joining must stay balanced — never orphan threads.
-// ═══════════════════════════════════════════════════════════════════════════════
-
-    close_window, enumerate_windows, focus_window, set_window_pos, DeferredPositioner,
-    WindowId, SET_WINDOW_POS_FLAGS,
+    DeferredPositioner,
+    SET_WINDOW_POS_FLAGS,
+    WindowId,
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // AI_AGENT_STOP: APP_COORDINATOR — This is the central event dispatch loop.
+    // Before modifying event handling:
+    //   1. All events flow through process_event() — add new cases there.
+    //   2. handle_hotkey() dispatches all user actions — add new action strings.
+    //   3. apply_layout() is called after every state change — keep it fast.
+    //   4. Thread spawning/joining must stay balanced — never orphan threads.
+    // ═══════════════════════════════════════════════════════════════════════════════
+    close_window,
+    enumerate_windows,
+    focus_window,
+    set_window_pos,
 };
 use crate::platform::window::{should_manage_window, show_window};
 use crate::util::animation::interpolate_rect;
-use crate::util::dpi::{scale_rect_to_physical, BASE_DPI};
+use crate::util::dpi::{BASE_DPI, scale_rect_to_physical};
 use crate::util::rect::Rect;
 use crate::window::{WindowManager, filter, model::WindowState};
 use crate::workspace::WorkspaceManager;
 use crate::workspace::model::FocusDirection;
 
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::Notify;
 use tracing::{debug, error, info, warn};
 use windows::Win32::Foundation::{LPARAM, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetCurrentThreadId, HWND_TOP, PostThreadMessageW, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOCOPYBITS, SWP_SHOWWINDOW, WM_QUIT,
+    GetCurrentThreadId, HWND_TOP, PostThreadMessageW, SWP_FRAMECHANGED, SWP_NOACTIVATE,
+    SWP_NOCOPYBITS, SWP_SHOWWINDOW, WM_QUIT,
 };
 
 // ---------------------------------------------------------------------------
@@ -95,7 +100,8 @@ impl AppState {
         let focused_window = self.window_manager.get_focused()?;
 
         // Fast path: look up which monitor the focused window is on
-        if let Some((monitor_id, _ws_id)) = self.workspace_manager.get_window_location(focused_window)
+        if let Some((monitor_id, _ws_id)) =
+            self.workspace_manager.get_window_location(focused_window)
         {
             return self.monitors.iter().find(|m| m.id == monitor_id);
         }
@@ -120,7 +126,10 @@ impl AppState {
         let workspace = match self.workspace_manager.get_active_workspace(monitor_id) {
             Some(ws) => ws,
             None => {
-                debug!("No active workspace for monitor {}, skipping layout", monitor_id);
+                debug!(
+                    "No active workspace for monitor {}, skipping layout",
+                    monitor_id
+                );
                 return;
             }
         };
@@ -166,9 +175,17 @@ impl AppState {
             }
         };
 
-        let gaps = self.config.read().map(|c| c.gaps.clone()).unwrap_or_default();
-        let (inner_gaps, outer_gaps) =
-            effective_gaps(tiling_windows.len(), gaps.inner as i32, gaps.outer as i32, gaps.smart);
+        let gaps = self
+            .config
+            .read()
+            .map(|c| c.gaps.clone())
+            .unwrap_or_default();
+        let (inner_gaps, outer_gaps) = effective_gaps(
+            tiling_windows.len(),
+            gaps.inner as i32,
+            gaps.outer as i32,
+            gaps.smart,
+        );
 
         let workspace_rect = monitor.work_area_with_gaps(outer_gaps as u32);
 
@@ -240,7 +257,10 @@ impl AppState {
         }
 
         if !positioner.commit() {
-            warn!("Deferred window position commit failed on monitor {}", monitor_id);
+            warn!(
+                "Deferred window position commit failed on monitor {}",
+                monitor_id
+            );
         }
 
         // Apply DWM border colors
@@ -444,12 +464,8 @@ impl App {
                                 )
                                 .0 > 0
                                 {
-                                    windows::Win32::UI::WindowsAndMessaging::TranslateMessage(
-                                        &msg,
-                                    );
-                                    windows::Win32::UI::WindowsAndMessaging::DispatchMessageW(
-                                        &msg,
-                                    );
+                                    windows::Win32::UI::WindowsAndMessaging::TranslateMessage(&msg);
+                                    windows::Win32::UI::WindowsAndMessaging::DispatchMessageW(&msg);
                                 } else {
                                     break;
                                 }
@@ -497,7 +513,9 @@ impl App {
                     match action_rx.recv_timeout(Duration::from_millis(100)) {
                         Ok(action) => {
                             debug!("Hotkey action received: {}", action);
-                            if let Err(e) = event_tx_for_hotkey.send(WindowEvent::HotkeyAction(action)) {
+                            if let Err(e) =
+                                event_tx_for_hotkey.send(WindowEvent::HotkeyAction(action))
+                            {
                                 error!("Failed to send hotkey action to event channel: {}", e);
                             }
                         }
@@ -535,10 +553,7 @@ impl App {
 
         // 4. Main event loop -- process events with a timeout so we can check `running`
         while self.state.running {
-            match self
-                .event_rx
-                .recv_timeout(Duration::from_millis(100))
-            {
+            match self.event_rx.recv_timeout(Duration::from_millis(100)) {
                 Ok(event) => {
                     debug!("Received event: {:?}", event);
                     self.process_event(event);
@@ -647,10 +662,7 @@ impl App {
                 .unwrap_or(0);
 
             if let Err(e) = self.state.workspace_manager.add_window(hwnd, monitor_id) {
-                warn!(
-                    "Failed to add window {:?} to workspace: {}",
-                    hwnd, e
-                );
+                warn!("Failed to add window {:?} to workspace: {}", hwnd, e);
                 return;
             }
 
@@ -687,7 +699,10 @@ impl App {
             self.state.workspace_manager.get_window_location(hwnd)
         {
             // Collect monitor IDs that own this workspace first to avoid borrow issues
-            let monitor_ids: Vec<u32> = self.state.workspace_manager.monitors
+            let monitor_ids: Vec<u32> = self
+                .state
+                .workspace_manager
+                .monitors
                 .iter()
                 .filter(|(_, mon_ws)| mon_ws.workspaces.iter().any(|ws| ws.id == workspace_id))
                 .map(|(&mon_id, _)| mon_id)
@@ -738,10 +753,7 @@ impl App {
         if let Some(window) = self.state.window_manager.get_window(hwnd) {
             if window.state == WindowState::Tiling {
                 // User moved a tiled window -- float it
-                info!(
-                    "User moved tiled window {:?} -- converting to float",
-                    hwnd
-                );
+                info!("User moved tiled window {:?} -- converting to float", hwnd);
                 drop(window);
                 self.state.window_manager.toggle_float(hwnd);
 
@@ -797,7 +809,9 @@ impl App {
         // - Initialise workspaces only for newly connected monitors
         // For now, re-init all monitors and re-apply layouts as a safe fallback
 
-        self.state.workspace_manager.init_monitors(&self.state.monitors);
+        self.state
+            .workspace_manager
+            .init_monitors(&self.state.monitors);
         self.state.apply_all_layouts();
     }
 
@@ -884,7 +898,10 @@ impl App {
                 if let Some(rest) = other.strip_prefix("workspace_") {
                     if let Ok(id) = rest.parse::<u32>() {
                         let id = if id == 0 { 10 } else { id };
-                        let max_ws = self.state.config.read()
+                        let max_ws = self
+                            .state
+                            .config
+                            .read()
                             .map(|c| c.workspaces.count)
                             .unwrap_or(10);
                         let clamped = id.clamp(1, max_ws);
@@ -898,7 +915,10 @@ impl App {
                 if let Some(rest) = other.strip_prefix("move_to_workspace_") {
                     if let Ok(id) = rest.parse::<u32>() {
                         let id = if id == 0 { 10 } else { id };
-                        let max_ws = self.state.config.read()
+                        let max_ws = self
+                            .state
+                            .config
+                            .read()
                             .map(|c| c.workspaces.count)
                             .unwrap_or(10);
                         let clamped = id.clamp(1, max_ws);
@@ -917,7 +937,11 @@ impl App {
 
     /// Launch the configured terminal emulator.
     fn exec_terminal(&self) -> anyhow::Result<()> {
-        let config = self.state.config.read().map_err(|e| anyhow::anyhow!("Config lock poisoned: {}", e))?;
+        let config = self
+            .state
+            .config
+            .read()
+            .map_err(|e| anyhow::anyhow!("Config lock poisoned: {}", e))?;
         let terminal = config.general.terminal.clone();
         drop(config);
 
@@ -925,9 +949,7 @@ impl App {
 
         std::process::Command::new(&terminal)
             .spawn()
-            .map_err(|e| {
-                anyhow::anyhow!("Failed to launch terminal '{}': {}", terminal, e)
-            })?;
+            .map_err(|e| anyhow::anyhow!("Failed to launch terminal '{}': {}", terminal, e))?;
 
         Ok(())
     }
@@ -959,10 +981,16 @@ impl App {
         };
 
         // Use the workspace manager's cycle_focus for basic cycling
-        self.state.workspace_manager.cycle_focus(monitor_id, direction.clone());
+        self.state
+            .workspace_manager
+            .cycle_focus(monitor_id, direction.clone());
 
         // Focus the window that is now focused in the workspace
-        if let Some(ws) = self.state.workspace_manager.get_active_workspace(monitor_id) {
+        if let Some(ws) = self
+            .state
+            .workspace_manager
+            .get_active_workspace(monitor_id)
+        {
             if let Some(focused) = ws.focused_window {
                 focus_window(focused.as_raw());
             }
@@ -989,13 +1017,20 @@ impl App {
         {
             Some((mon_id, _)) => mon_id,
             None => {
-                warn!("Focused window {:?} not tracked in any workspace", focused_id);
+                warn!(
+                    "Focused window {:?} not tracked in any workspace",
+                    focused_id
+                );
                 return;
             }
         };
 
         // Find an adjacent monitor in the given direction
-        let current_monitor = match self.state.monitors.iter().find(|m| m.id == current_monitor_id)
+        let current_monitor = match self
+            .state
+            .monitors
+            .iter()
+            .find(|m| m.id == current_monitor_id)
         {
             Some(m) => m.clone(),
             None => return,
@@ -1009,16 +1044,10 @@ impl App {
             .iter()
             .filter(|m| m.id != current_monitor_id)
             .min_by(|a, b| {
-                let a_dist = weighted_directional_distance(
-                    current_center,
-                    a.rect.center(),
-                    &direction,
-                );
-                let b_dist = weighted_directional_distance(
-                    current_center,
-                    b.rect.center(),
-                    &direction,
-                );
+                let a_dist =
+                    weighted_directional_distance(current_center, a.rect.center(), &direction);
+                let b_dist =
+                    weighted_directional_distance(current_center, b.rect.center(), &direction);
                 a_dist
                     .partial_cmp(&b_dist)
                     .unwrap_or(std::cmp::Ordering::Equal)
@@ -1027,7 +1056,10 @@ impl App {
 
         if let Some(target) = target_monitor {
             // Read the target workspace before any mutable borrows
-            let target_workspace = self.state.workspace_manager.monitors
+            let target_workspace = self
+                .state
+                .workspace_manager
+                .monitors
                 .get(&target.id)
                 .map(|mw| mw.active_workspace);
 
@@ -1053,7 +1085,10 @@ impl App {
             self.state
                 .workspace_manager
                 .cycle_focus(current_monitor_id, direction);
-            if let Some(ws) = self.state.workspace_manager.get_active_workspace(current_monitor_id)
+            if let Some(ws) = self
+                .state
+                .workspace_manager
+                .get_active_workspace(current_monitor_id)
             {
                 if let Some(focused) = ws.focused_window {
                     focus_window(focused.as_raw());
@@ -1065,13 +1100,13 @@ impl App {
 
     /// Switch the focused monitor to the given workspace.
     fn switch_workspace(&mut self, id: u32) {
-        let monitor_id = self
-            .state
-            .get_focused_monitor()
-            .map(|m| m.id)
-            .unwrap_or(0);
+        let monitor_id = self.state.get_focused_monitor().map(|m| m.id).unwrap_or(0);
 
-        if let Err(e) = self.state.workspace_manager.switch_workspace(monitor_id, id) {
+        if let Err(e) = self
+            .state
+            .workspace_manager
+            .switch_workspace(monitor_id, id)
+        {
             warn!("Failed to switch to workspace {}: {}", id, e);
             return;
         }
@@ -1125,7 +1160,10 @@ impl App {
         }
 
         // Find which monitor now hosts workspace `id`
-        let target_monitor_ids: Vec<u32> = self.state.workspace_manager.monitors
+        let target_monitor_ids: Vec<u32> = self
+            .state
+            .workspace_manager
+            .monitors
             .iter()
             .filter(|(_, monitor_ws)| monitor_ws.workspaces.iter().any(|ws| ws.id == id))
             .map(|(&monitor_id, _)| monitor_id)
@@ -1139,13 +1177,13 @@ impl App {
 
     /// Cycle the layout on the active workspace of the focused monitor.
     fn cycle_layout(&mut self) {
-        let monitor_id = self
-            .state
-            .get_focused_monitor()
-            .map(|m| m.id)
-            .unwrap_or(0);
+        let monitor_id = self.state.get_focused_monitor().map(|m| m.id).unwrap_or(0);
 
-        if let Some(ws) = self.state.workspace_manager.get_active_workspace_mut(monitor_id) {
+        if let Some(ws) = self
+            .state
+            .workspace_manager
+            .get_active_workspace_mut(monitor_id)
+        {
             let new_layout = ws.layout_engine.cycle();
             info!(
                 "Cycled layout on monitor {} to {:?}",
@@ -1163,13 +1201,13 @@ impl App {
     /// building the BSP tree. The delta is clamped to [0.1, 0.9] to prevent
     /// windows from collapsing to zero size.
     fn resize_split(&mut self, delta: f64) {
-        let monitor_id = self
-            .state
-            .get_focused_monitor()
-            .map(|m| m.id)
-            .unwrap_or(0);
+        let monitor_id = self.state.get_focused_monitor().map(|m| m.id).unwrap_or(0);
 
-        let Some(ws) = self.state.workspace_manager.get_active_workspace_mut(monitor_id) else {
+        let Some(ws) = self
+            .state
+            .workspace_manager
+            .get_active_workspace_mut(monitor_id)
+        else {
             warn!("No active workspace on monitor {} for resize", monitor_id);
             return;
         };
@@ -1312,11 +1350,7 @@ impl App {
 /// Movement opposite to the requested direction returns `INFINITY` so that
 /// only windows *in* the direction are considered.  Alignment on the target
 /// axis is strongly preferred (2x weight) over orthogonal distance.
-fn weighted_directional_distance(
-    from: (i32, i32),
-    to: (i32, i32),
-    dir: &FocusDirection,
-) -> f64 {
+fn weighted_directional_distance(from: (i32, i32), to: (i32, i32), dir: &FocusDirection) -> f64 {
     let dx = (to.0 - from.0) as f64;
     let dy = (to.1 - from.1) as f64;
 
@@ -1348,3 +1382,6 @@ fn weighted_directional_distance(
             } else {
                 dx.abs() + dy * 2.0
             }
+        }
+    }
+}

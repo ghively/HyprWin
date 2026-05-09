@@ -160,18 +160,14 @@ impl Workspace {
 
         let current_idx = self.get_focused_index();
         let new_idx = match direction {
-            FocusDirection::Left
-            | FocusDirection::Up
-            | FocusDirection::Previous => {
+            FocusDirection::Left | FocusDirection::Up | FocusDirection::Previous => {
                 if current_idx == 0 {
                     self.windows.len() - 1
                 } else {
                     current_idx - 1
                 }
             }
-            FocusDirection::Right
-            | FocusDirection::Down
-            | FocusDirection::Next => {
+            FocusDirection::Right | FocusDirection::Down | FocusDirection::Next => {
                 if current_idx + 1 >= self.windows.len() {
                     0
                 } else {
@@ -206,11 +202,7 @@ impl Workspace {
 
         let window = self.windows.remove(from_idx);
         // Adjust target index if removal shifted it.
-        let insert_idx = if from_idx < to_idx {
-            to_idx
-        } else {
-            to_idx
-        };
+        let insert_idx = if from_idx < to_idx { to_idx } else { to_idx };
         self.windows.insert(insert_idx, window);
 
         // Update focused window pointer if it was the moved window.

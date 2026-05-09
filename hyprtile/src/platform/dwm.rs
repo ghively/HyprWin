@@ -126,8 +126,7 @@ pub fn set_corner_preference(hwnd: isize, rounded: bool) -> anyhow::Result<()> {
         if result.is_ok() {
             trace!(
                 "Set corner preference {:?} for hwnd=0x{:X}",
-                preference,
-                hwnd.0
+                preference, hwnd.0
             );
             Ok(())
         } else {
@@ -244,18 +243,24 @@ pub fn is_border_color_supported() -> bool {
     unsafe {
         // DWMWA_BORDER_COLOR was introduced in Windows 11 21H2 (build 22000)
         // Check OS version to determine availability
-        let mut info = mem::MaybeUninit::<windows::Win32::System::SystemInformation::OSVERSIONINFOEXW>::uninit();
+        let mut info = mem::MaybeUninit::<
+            windows::Win32::System::SystemInformation::OSVERSIONINFOEXW,
+        >::uninit();
         let info_ptr = info.as_mut_ptr();
-        (*info_ptr).dwOSVersionInfoSize = mem::size_of::<windows::Win32::System::SystemInformation::OSVERSIONINFOEXW>() as u32;
+        (*info_ptr).dwOSVersionInfoSize =
+            mem::size_of::<windows::Win32::System::SystemInformation::OSVERSIONINFOEXW>() as u32;
 
         // RtlGetVersion is the reliable way to get the true OS version
-        let ntdll = windows::Win32::System::LibraryLoader::GetModuleHandleW(windows::w!("ntdll.dll"));
+        let ntdll =
+            windows::Win32::System::LibraryLoader::GetModuleHandleW(windows::w!("ntdll.dll"));
         let ntdll = match ntdll {
             Ok(h) => h,
             Err(_) => return false,
         };
 
-        type RtlGetVersionFn = unsafe extern "system" fn(*mut windows::Win32::System::SystemInformation::OSVERSIONINFOW) -> i32;
+        type RtlGetVersionFn = unsafe extern "system" fn(
+            *mut windows::Win32::System::SystemInformation::OSVERSIONINFOW,
+        ) -> i32;
         let proc = windows::Win32::System::LibraryLoader::GetProcAddress(
             ntdll,
             windows::s!("RtlGetVersion"),
@@ -266,11 +271,16 @@ pub fn is_border_color_supported() -> bool {
         }
 
         // SAFETY: FARPROC and RtlGetVersionFn must have the same size for transmute to be valid.
-        assert_eq!(std::mem::size_of::<windows::Win32::Foundation::FARPROC>(), std::mem::size_of::<RtlGetVersionFn>());
+        assert_eq!(
+            std::mem::size_of::<windows::Win32::Foundation::FARPROC>(),
+            std::mem::size_of::<RtlGetVersionFn>()
+        );
 
         if let Some(func) = proc {
             let rtl_get_version: RtlGetVersionFn = std::mem::transmute(func);
-            let status = rtl_get_version(info_ptr as *mut windows::Win32::System::SystemInformation::OSVERSIONINFOW);
+            let status = rtl_get_version(
+                info_ptr as *mut windows::Win32::System::SystemInformation::OSVERSIONINFOW,
+            );
             if status != 0 {
                 return false;
             }
@@ -288,10 +298,6 @@ pub fn is_composition_enabled() -> bool {
     unsafe {
         let mut enabled: i32 = 0;
         let result = DwmIsCompositionEnabled(&mut enabled);
-        if result.is_ok() {
-            enabled != 0
-        } else {
-            false
-        }
+        if result.is_ok() { enabled != 0 } else { false }
     }
 }

@@ -48,9 +48,7 @@ pub enum Node {
         right: Box<Node>,
     },
     /// Leaf node containing a window.
-    Window {
-        window_id: WindowId,
-    },
+    Window { window_id: WindowId },
     /// Empty leaf slot.
     Empty,
 }
@@ -106,7 +104,9 @@ impl Node {
                 *self = Node::Window { window_id };
                 trace!(?window_id, "inserted into empty node");
             }
-            Node::Window { window_id: existing } => {
+            Node::Window {
+                window_id: existing,
+            } => {
                 let existing_id = *existing;
                 *self = Node::Split {
                     direction,
@@ -116,7 +116,12 @@ impl Node {
                     }),
                     right: Box::new(Node::Window { window_id }),
                 };
-                trace!(?existing_id, ?window_id, ?direction, "split existing window");
+                trace!(
+                    ?existing_id,
+                    ?window_id,
+                    ?direction,
+                    "split existing window"
+                );
             }
             Node::Split {
                 left,
@@ -186,10 +191,9 @@ impl Node {
     pub fn find_window_node(&mut self, window_id: WindowId) -> Option<&mut Node> {
         match self {
             Node::Window { window_id: wid } if *wid == window_id => Some(self),
-            Node::Split { left, right, .. } => {
-                left.find_window_node(window_id)
-                    .or_else(|| right.find_window_node(window_id))
-            }
+            Node::Split { left, right, .. } => left
+                .find_window_node(window_id)
+                .or_else(|| right.find_window_node(window_id)),
             _ => None,
         }
     }
@@ -229,10 +233,7 @@ impl Node {
     pub fn rebalance_ratios(&mut self) {
         match self {
             Node::Split {
-                ratio,
-                left,
-                right,
-                ..
+                ratio, left, right, ..
             } => {
                 *ratio = 0.5;
                 left.rebalance_ratios();

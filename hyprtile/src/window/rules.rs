@@ -4,7 +4,6 @@
 //! [`Window`] objects at registration time.  Rules can force a window
 //! to float, pin it to a specific workspace or monitor, or set its
 /// initial size.
-
 use crate::config::types::{WindowAction, WindowRule};
 use crate::window::model::Window;
 use regex::Regex;
@@ -47,7 +46,10 @@ impl RuleEngine {
         for rule in matching {
             debug!(
                 "Applying rule to window {} (class='{}', title='{}'): {:?}",
-                window.id.as_raw().0, window.class_name, window.title, rule
+                window.id.as_raw().0,
+                window.class_name,
+                window.title,
+                rule
             );
 
             if let Some(ref action) = rule.action {
@@ -154,7 +156,10 @@ pub fn class_matches(class: &str, pattern: &str) -> bool {
     match Regex::new(pattern) {
         Ok(re) => re.is_match(class),
         Err(e) => {
-            warn!("Invalid class regex '{}': {}, falling back to literal", pattern, e);
+            warn!(
+                "Invalid class regex '{}': {}, falling back to literal",
+                pattern, e
+            );
             class == pattern
         }
     }
@@ -165,7 +170,10 @@ pub fn title_matches(title: &str, pattern: &str) -> bool {
     match Regex::new(pattern) {
         Ok(re) => re.is_match(title),
         Err(e) => {
-            warn!("Invalid title regex '{}': {}, falling back to literal", pattern, e);
+            warn!(
+                "Invalid title regex '{}': {}, falling back to literal",
+                pattern, e
+            );
             title == pattern
         }
     }
@@ -176,7 +184,10 @@ pub fn process_matches(process: &str, pattern: &str) -> bool {
     match Regex::new(pattern) {
         Ok(re) => re.is_match(process),
         Err(e) => {
-            warn!("Invalid process regex '{}': {}, falling back to literal", pattern, e);
+            warn!(
+                "Invalid process regex '{}': {}, falling back to literal",
+                pattern, e
+            );
             process == pattern
         }
     }

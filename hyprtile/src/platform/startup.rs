@@ -7,22 +7,31 @@
 
 use std::path::PathBuf;
 use tracing::{debug, info, warn};
-use windows::core::{w, HSTRING, PCWSTR};
 use windows::Win32::System::Registry::{
-// ═══════════════════════════════════════════════════════════════════════════════
-// AI_AGENT_STOP: AUTO_START — Windows registry integration.
-// Before modifying registry behavior:
-//   1. Registry path: HKCU\Software\Microsoft\Windows\CurrentVersion\Run.
-//   2. The value name is "HyprTile" — changing it breaks existing auto-start entries.
-//   3. The value data is the full path to hyprtile.exe.
-//   4. Always close registry keys with RegCloseKey.
-//   5. Requires no admin privileges (HKCU, not HKLM).
-// ═══════════════════════════════════════════════════════════════════════════════
-
-    RegCloseKey, RegCreateKeyExW, RegDeleteValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
-    HKEY, HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE, KEY_WRITE, REG_OPTION_NON_VOLATILE,
+    HKEY,
+    HKEY_CURRENT_USER,
+    KEY_READ,
+    KEY_SET_VALUE,
+    KEY_WRITE,
+    REG_OPTION_NON_VOLATILE,
     REG_SZ,
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // AI_AGENT_STOP: AUTO_START — Windows registry integration.
+    // Before modifying registry behavior:
+    //   1. Registry path: HKCU\Software\Microsoft\Windows\CurrentVersion\Run.
+    //   2. The value name is "HyprTile" — changing it breaks existing auto-start entries.
+    //   3. The value data is the full path to hyprtile.exe.
+    //   4. Always close registry keys with RegCloseKey.
+    //   5. Requires no admin privileges (HKCU, not HKLM).
+    // ═══════════════════════════════════════════════════════════════════════════════
+    RegCloseKey,
+    RegCreateKeyExW,
+    RegDeleteValueW,
+    RegOpenKeyExW,
+    RegQueryValueExW,
+    RegSetValueExW,
 };
+use windows::core::{HSTRING, PCWSTR, w};
 
 // HRESULT for ERROR_FILE_NOT_FOUND (Win32 error 2 -> 0x80070002)
 const HRESULT_ERROR_FILE_NOT_FOUND: u32 = 0x80070002;
@@ -57,9 +66,7 @@ pub fn enable_auto_start() -> anyhow::Result<()> {
             &mut hkey,
             None,
         );
-        result.map_err(|e| {
-            anyhow::anyhow!("Failed to create/open Run registry key: {}", e)
-        })?;
+        result.map_err(|e| anyhow::anyhow!("Failed to create/open Run registry key: {}", e))?;
 
         let path_wide = HSTRING::from(&path_str);
         let path_bytes = path_wide.as_wide();
@@ -79,9 +86,7 @@ pub fn enable_auto_start() -> anyhow::Result<()> {
 
         let _ = RegCloseKey(hkey);
 
-        result.map_err(|e| {
-            anyhow::anyhow!("Failed to write auto-start registry value: {}", e)
-        })?;
+        result.map_err(|e| anyhow::anyhow!("Failed to write auto-start registry value: {}", e))?;
     }
 
     info!("Auto-start enabled successfully");
@@ -105,9 +110,7 @@ pub fn disable_auto_start() -> anyhow::Result<()> {
             KEY_SET_VALUE,
             &mut hkey,
         );
-        result.map_err(|e| {
-            anyhow::anyhow!("Failed to open Run registry key: {}", e)
-        })?;
+        result.map_err(|e| anyhow::anyhow!("Failed to open Run registry key: {}", e))?;
 
         let result = RegDeleteValueW(hkey, VALUE_NAME);
         let _ = RegCloseKey(hkey);
@@ -137,7 +140,10 @@ pub fn is_auto_start_enabled() -> bool {
     let current_exe = match get_executable_path() {
         Ok(p) => p.to_string_lossy().to_string(),
         Err(e) => {
-            warn!("Cannot determine executable path for auto-start check: {}", e);
+            warn!(
+                "Cannot determine executable path for auto-start check: {}",
+                e
+            );
             return false;
         }
     };
@@ -171,9 +177,8 @@ pub fn is_auto_start_enabled() -> bool {
 
 /// Return the full path to the current executable.
 fn get_executable_path() -> anyhow::Result<PathBuf> {
-    std::env::current_exe().map_err(|e| {
-        anyhow::anyhow!("Failed to get current executable path: {}", e)
-    })
+    std::env::current_exe()
+        .map_err(|e| anyhow::anyhow!("Failed to get current executable path: {}", e))
 }
 
 /// Read the HyprTile value from the Run registry key.
@@ -182,16 +187,8 @@ fn get_executable_path() -> anyhow::Result<PathBuf> {
 /// not exist, or an error if the registry could not be read.
 unsafe fn get_registry_value() -> anyhow::Result<Option<String>> {
     let mut hkey = HKEY::default();
-    let result = RegOpenKeyExW(
-        HKEY_CURRENT_USER,
-        RUN_KEY_PATH,
-        None,
-        KEY_READ,
-        &mut hkey,
-    );
-    result.map_err(|e| {
-        anyhow::anyhow!("Failed to open Run registry key for reading: {}", e)
-    })?;
+    let result = RegOpenKeyExW(HKEY_CURRENT_USER, RUN_KEY_PATH, None, KEY_READ, &mut hkey);
+    result.map_err(|e| anyhow::anyhow!("Failed to open Run registry key for reading: {}", e))?;
 
     // First query to get the required buffer size
     let mut data_type = 0u32;
@@ -229,9 +226,7 @@ unsafe fn get_registry_value() -> anyhow::Result<Option<String>> {
 
     let _ = RegCloseKey(hkey);
 
-    result.map_err(|e| {
-        anyhow::anyhow!("Failed to read auto-start registry value: {}", e)
-    })?;
+    result.map_err(|e| anyhow::anyhow!("Failed to read auto-start registry value: {}", e))?;
 
     if data_type != REG_SZ.0 {
         return Err(anyhow::anyhow!(
@@ -262,7 +257,10 @@ mod tests {
     fn test_get_executable_path() {
         let path = get_executable_path();
         assert!(path.is_ok(), "Should be able to get executable path");
-        let path = match path { Ok(p) => p, Err(_) => return false };
+        let path = match path {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
         assert!(path.is_absolute(), "Executable path should be absolute");
     }
 

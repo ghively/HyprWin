@@ -57,10 +57,7 @@ impl Rect {
     /// Check if the rectangle contains the given point.
     pub fn contains(&self, point: (i32, i32)) -> bool {
         let (px, py) = point;
-        px >= self.x
-            && px < self.x + self.width
-            && py >= self.y
-            && py < self.y + self.height
+        px >= self.x && px < self.x + self.width && py >= self.y && py < self.y + self.height
     }
 
     /// Check if this rectangle intersects with another.

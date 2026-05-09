@@ -6,6 +6,6 @@
 //   3. Run tests after changes: cargo test
 // ═══════════════════════════════════════════════════════════════════════════════
 
-pub mod rect;
-pub mod dpi;
 pub mod animation;
+pub mod dpi;
+pub mod rect;

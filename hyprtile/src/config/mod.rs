@@ -136,7 +136,10 @@ impl ConfigManager {
     ///
     /// The in-memory config is replaced atomically.
     pub fn reload(&self) -> Result<()> {
-        info!("Reloading configuration from {}", self.config_path.display());
+        info!(
+            "Reloading configuration from {}",
+            self.config_path.display()
+        );
 
         let new_config = Self::load_from_path(&self.config_path)?;
 
@@ -162,65 +165,60 @@ impl ConfigManager {
         let config_path = self.config_path.clone();
         let config_arc = Arc::clone(&self.config);
 
-        let watcher = notify::recommended_watcher(
-            move |res: Result<Event, notify::Error>| {
-                match res {
-                    Ok(event) => {
-                        // Only react to modify / create / remove events.
-                        let relevant = matches!(
-                            event.kind,
-                            notify::EventKind::Modify(_)
-                                | notify::EventKind::Create(_)
-                                | notify::EventKind::Remove(_)
-                        );
-                        if !relevant {
-                            return;
-                        }
-
-                        // Check if the changed file is our config.
-                        let is_our_file = event.paths.iter().any(|p| p == &config_path);
-                        if !is_our_file {
-                            return;
-                        }
-
-                        // Small debounce to avoid reloading on rapid successive events.
-                        std::thread::sleep(Duration::from_millis(100));
-
-                        info!("Config file changed on disk, auto-reloading");
-
-                        let new_config = match ConfigManager::load_from_path(&config_path) {
-                            Ok(cfg) => cfg,
-                            Err(e) => {
-                                error!("Failed to reload config: {}", e);
-                                return;
-                            }
-                        };
-
-                        match config_arc.write() {
-                            Ok(mut guard) => {
-                                *guard = new_config;
-                                info!("Configuration auto-reloaded successfully");
-                            }
-                            Err(e) => {
-                                error!("Config lock poisoned during auto-reload: {}", e);
-                            }
-                        }
+        let watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
+            match res {
+                Ok(event) => {
+                    // Only react to modify / create / remove events.
+                    let relevant = matches!(
+                        event.kind,
+                        notify::EventKind::Modify(_)
+                            | notify::EventKind::Create(_)
+                            | notify::EventKind::Remove(_)
+                    );
+                    if !relevant {
+                        return;
                     }
-                    Err(e) => {
-                        error!("Config file watcher error: {}", e);
+
+                    // Check if the changed file is our config.
+                    let is_our_file = event.paths.iter().any(|p| p == &config_path);
+                    if !is_our_file {
+                        return;
+                    }
+
+                    // Small debounce to avoid reloading on rapid successive events.
+                    std::thread::sleep(Duration::from_millis(100));
+
+                    info!("Config file changed on disk, auto-reloading");
+
+                    let new_config = match ConfigManager::load_from_path(&config_path) {
+                        Ok(cfg) => cfg,
+                        Err(e) => {
+                            error!("Failed to reload config: {}", e);
+                            return;
+                        }
+                    };
+
+                    match config_arc.write() {
+                        Ok(mut guard) => {
+                            *guard = new_config;
+                            info!("Configuration auto-reloaded successfully");
+                        }
+                        Err(e) => {
+                            error!("Config lock poisoned during auto-reload: {}", e);
+                        }
                     }
                 }
-            },
-        )
+                Err(e) => {
+                    error!("Config file watcher error: {}", e);
+                }
+            }
+        })
         .context("failed to create config file watcher")?;
 
         let mut watcher: RecommendedWatcher = watcher;
 
         // Watch the parent directory so we catch renames/overwrites.
-        let watch_dir = self
-            .config_path
-            .parent()
-            .unwrap_or_else(|| Path::new("."));
+        let watch_dir = self.config_path.parent().unwrap_or_else(|| Path::new("."));
         watcher
             .watch(watch_dir, RecursiveMode::NonRecursive)
             .context("failed to start watching config directory")?;
@@ -384,9 +382,11 @@ mod tests {
         let mut config = defaults::default_config();
         config.workspaces.count = 0;
         let issues = ConfigManager::validate(&config);
-        assert!(issues
-            .iter()
-            .any(|i| i.contains("workspaces.count must be at least")));
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.contains("workspaces.count must be at least"))
+        );
     }
 
     #[test]
@@ -398,9 +398,7 @@ mod tests {
             default_layout: "invalid_layout".to_string(),
         });
         let issues = ConfigManager::validate(&config);
-        assert!(issues
-            .iter()
-            .any(|i| i.contains("not a recognised layout")));
+        assert!(issues.iter().any(|i| i.contains("not a recognised layout")));
     }
 
     #[test]
@@ -417,9 +415,7 @@ mod tests {
             position: None,
         });
         let issues = ConfigManager::validate(&config);
-        assert!(issues
-            .iter()
-            .any(|i| i.contains("no match criteria")));
+        assert!(issues.iter().any(|i| i.contains("no match criteria")));
     }
 
     #[test]

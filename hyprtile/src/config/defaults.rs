@@ -76,10 +76,7 @@ pub fn default_keybinds() -> HashMap<String, String> {
 
     // Workspaces 1-9
     for i in 1..=9 {
-        map.insert(
-            format!("mod+{}", i),
-            format!("workspace_{}", i),
-        );
+        map.insert(format!("mod+{}", i), format!("workspace_{}", i));
     }
 
     // Workspace 10 is bound to 0
@@ -187,15 +184,9 @@ mod tests {
         let rules = default_window_rules_vec();
         assert_eq!(rules.len(), 2);
         assert!(rules[0].match_class.as_ref().unwrap().contains("steam"));
-        assert_eq!(
-            rules[1].match_title.as_ref().unwrap(),
-            "Picture-in-Picture"
-        );
+        assert_eq!(rules[1].match_title.as_ref().unwrap(), "Picture-in-Picture");
         assert_eq!(rules[1].size, Some([400, 225]));
-        assert_eq!(
-            rules[1].position.as_ref().unwrap(),
-            "bottom_right"
-        );
+        assert_eq!(rules[1].position.as_ref().unwrap(), "bottom_right");
     }
 
     #[test]

@@ -63,11 +63,7 @@ pub fn get_monitor_dpi(hmonitor: isize) -> u32 {
 /// Uses the `GetDpiForSystem` Win32 API.
 pub fn get_system_dpi() -> u32 {
     let dpi = unsafe { GetDpiForSystem() };
-    if dpi > 0 {
-        dpi
-    } else {
-        BASE_DPI
-    }
+    if dpi > 0 { dpi } else { BASE_DPI }
 }
 
 /// Scale a rectangle from logical to physical coordinates for a monitor.

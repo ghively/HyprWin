@@ -68,7 +68,10 @@ impl Animation {
     ///
     /// Panics if `duration_ms` is zero.
     pub fn new(duration_ms: u32, easing: Easing) -> Self {
-        assert!(duration_ms > 0, "animation duration must be greater than zero");
+        assert!(
+            duration_ms > 0,
+            "animation duration must be greater than zero"
+        );
         Self {
             duration_ms,
             elapsed_ms: 0,

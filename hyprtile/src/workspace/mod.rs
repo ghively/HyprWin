@@ -17,10 +17,10 @@
 
 pub mod model;
 
-use model::*;
 use crate::platform::monitor::Monitor;
 use crate::platform::window::WindowId;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use model::*;
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
@@ -119,17 +119,18 @@ impl WorkspaceManager {
     ///
     /// The window is removed from its current workspace (if any) and
     /// inserted into the target workspace on the **same monitor**.
-    pub fn move_window_to_workspace(
-        &mut self,
-        window: WindowId,
-        workspace_id: u32,
-    ) -> Result<()> {
+    pub fn move_window_to_workspace(&mut self, window: WindowId, workspace_id: u32) -> Result<()> {
         // Find which monitor currently hosts this window.
         let monitor_id = self
             .window_to_monitor
             .get(&window)
             .copied()
-            .ok_or_else(|| anyhow!("Window {} is not assigned to any monitor", window.as_raw().0))?;
+            .ok_or_else(|| {
+                anyhow!(
+                    "Window {} is not assigned to any monitor",
+                    window.as_raw().0
+                )
+            })?;
 
         // Remove from current workspace.
         if let Some(current_ws_id) = self.window_to_workspace.remove(&window) {
@@ -155,7 +156,9 @@ impl WorkspaceManager {
 
         debug!(
             "Moved window {} to workspace {} on monitor {}",
-            window.as_raw().0, workspace_id, monitor_id
+            window.as_raw().0,
+            workspace_id,
+            monitor_id
         );
         Ok(())
     }
@@ -174,7 +177,9 @@ impl WorkspaceManager {
         if let Some((old_monitor, old_workspace)) = self.remove_window_internal(window) {
             debug!(
                 "Removed window {} from monitor {} workspace {} for monitor move",
-                window.as_raw().0, old_monitor, old_workspace
+                window.as_raw().0,
+                old_monitor,
+                old_workspace
             );
         }
 
@@ -184,16 +189,16 @@ impl WorkspaceManager {
             .get_mut(&monitor_id)
             .ok_or_else(|| anyhow!("Monitor {} disappeared during move", monitor_id))?;
         let active_ws_id = target_monitor.active_workspace;
-        target_monitor
-            .get_active_workspace_mut()
-            .add_window(window);
+        target_monitor.get_active_workspace_mut().add_window(window);
 
         self.window_to_monitor.insert(window, monitor_id);
         self.window_to_workspace.insert(window, active_ws_id);
 
         debug!(
             "Moved window {} to monitor {} workspace {}",
-            window.as_raw().0, monitor_id, active_ws_id
+            window.as_raw().0,
+            monitor_id,
+            active_ws_id
         );
         Ok(())
     }
@@ -208,16 +213,16 @@ impl WorkspaceManager {
             .ok_or_else(|| anyhow!("Monitor {} not found", monitor_id))?;
 
         let active_ws_id = monitor.active_workspace;
-        monitor
-            .get_active_workspace_mut()
-            .add_window(window);
+        monitor.get_active_workspace_mut().add_window(window);
 
         self.window_to_monitor.insert(window, monitor_id);
         self.window_to_workspace.insert(window, active_ws_id);
 
         debug!(
             "Added window {} to monitor {} workspace {}",
-            window.as_raw().0, monitor_id, active_ws_id
+            window.as_raw().0,
+            monitor_id,
+            active_ws_id
         );
         Ok(())
     }
@@ -301,7 +306,11 @@ impl WorkspaceManager {
     pub fn get_all_windows(&self) -> Vec<WindowId> {
         self.monitors
             .values()
-            .flat_map(|mw| mw.workspaces.iter().flat_map(|ws| ws.windows.iter().copied()))
+            .flat_map(|mw| {
+                mw.workspaces
+                    .iter()
+                    .flat_map(|ws| ws.windows.iter().copied())
+            })
             .collect()
     }
 
@@ -315,10 +324,7 @@ impl WorkspaceManager {
     /// No-op if the monitor does not exist or the workspace is empty.
     pub fn cycle_focus(&mut self, monitor_id: u32, direction: FocusDirection) {
         let Some(mw) = self.monitors.get_mut(&monitor_id) else {
-            warn!(
-                "cycle_focus called for unknown monitor {}",
-                monitor_id
-            );
+            warn!("cycle_focus called for unknown monitor {}", monitor_id);
             return;
         };
         mw.get_active_workspace_mut().cycle_focus(direction);

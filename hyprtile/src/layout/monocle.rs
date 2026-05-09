@@ -5,9 +5,9 @@
 //! behind it. This is useful when you want to focus on a single task
 //! while keeping all other windows easily accessible via focus cycling.
 
+use super::gaps::{apply_gaps, effective_gaps};
 use crate::platform::window::WindowId;
 use crate::util::rect::Rect;
-use super::gaps::{apply_gaps, effective_gaps};
 use tracing::trace;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -111,8 +111,7 @@ mod tests {
     #[test]
     fn test_monocle_empty() {
         let workspace = Rect::new(0, 0, 1920, 1080);
-        let result =
-            MonocleLayout::calculate(&[], &workspace, 8, 8, true, 0);
+        let result = MonocleLayout::calculate(&[], &workspace, 8, 8, true, 0);
         assert!(result.is_empty());
     }
 
@@ -120,8 +119,7 @@ mod tests {
     fn test_monocle_single_window() {
         let workspace = Rect::new(0, 0, 1000, 600);
         let windows = vec![wid(1)];
-        let result =
-            MonocleLayout::calculate(&windows, &workspace, 0, 0, false, 0);
+        let result = MonocleLayout::calculate(&windows, &workspace, 0, 0, false, 0);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].0, wid(1));
         // Full workspace rect
@@ -132,8 +130,7 @@ mod tests {
     fn test_monocle_multiple_windows() {
         let workspace = Rect::new(0, 0, 1000, 600);
         let windows = vec![wid(1), wid(2), wid(3)];
-        let result =
-            MonocleLayout::calculate(&windows, &workspace, 0, 0, false, 1);
+        let result = MonocleLayout::calculate(&windows, &workspace, 0, 0, false, 1);
         assert_eq!(result.len(), 3);
 
         // All windows should have the same rectangle
@@ -147,8 +144,7 @@ mod tests {
     fn test_monocle_focused_on_top() {
         let workspace = Rect::new(0, 0, 1000, 600);
         let windows = vec![wid(1), wid(2), wid(3)];
-        let result =
-            MonocleLayout::calculate(&windows, &workspace, 0, 0, false, 1);
+        let result = MonocleLayout::calculate(&windows, &workspace, 0, 0, false, 1);
 
         // The focused window (index 1 = wid(2)) should be last in results
         assert_eq!(result.last().unwrap().0, wid(2));
@@ -159,8 +155,7 @@ mod tests {
         let workspace = Rect::new(0, 0, 1000, 600);
         let windows = vec![wid(1), wid(2)];
         // focused_idx out of bounds should be clamped
-        let result =
-            MonocleLayout::calculate(&windows, &workspace, 0, 0, false, 99);
+        let result = MonocleLayout::calculate(&windows, &workspace, 0, 0, false, 99);
         assert_eq!(result.len(), 2);
         // Should use last valid index
         assert_eq!(result.last().unwrap().0, wid(2));
@@ -175,8 +170,7 @@ mod tests {
     fn test_monocle_with_gaps() {
         let workspace = Rect::new(0, 0, 100, 100);
         let windows = vec![wid(1), wid(2)];
-        let result =
-            MonocleLayout::calculate(&windows, &workspace, 4, 4, false, 0);
+        let result = MonocleLayout::calculate(&windows, &workspace, 4, 4, false, 0);
         assert_eq!(result.len(), 2);
         // With gaps, rect should be smaller than workspace
         assert!(result[0].1.width < workspace.width);
@@ -187,8 +181,7 @@ mod tests {
     fn test_monocle_smart_gaps_single() {
         let workspace = Rect::new(0, 0, 100, 100);
         let windows = vec![wid(1)];
-        let result =
-            MonocleLayout::calculate(&windows, &workspace, 8, 8, true, 0);
+        let result = MonocleLayout::calculate(&windows, &workspace, 8, 8, true, 0);
         // With smart gaps and 1 window, should get full workspace
         assert_eq!(result[0].1, workspace);
     }

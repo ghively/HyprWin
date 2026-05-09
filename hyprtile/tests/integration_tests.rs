@@ -20,21 +20,23 @@
 use std::collections::HashMap;
 
 // Import the hyprtile library modules
-use hyprtile::util::rect::Rect;
-use hyprtile::layout::*;
-use hyprtile::layout::bsp::{Node, SplitDirection, build_dwindle_tree};
-use hyprtile::layout::gaps::{apply_gaps, effective_gaps};
-use hyprtile::layout::dwindle::DwindleLayout;
-use hyprtile::layout::master_stack::{MasterStackLayout, MasterStackConfig, Orientation};
-use hyprtile::layout::monocle::MonocleLayout;
-use hyprtile::layout::grid::GridLayout;
-use hyprtile::window::model::*;
-use hyprtile::workspace::model::*;
-use hyprtile::config::types::*;
 use hyprtile::config::defaults::default_config;
+use hyprtile::config::types::*;
 use hyprtile::ipc::protocol::*;
+use hyprtile::layout::bsp::{Node, SplitDirection, build_dwindle_tree};
+use hyprtile::layout::dwindle::DwindleLayout;
+use hyprtile::layout::gaps::{apply_gaps, effective_gaps};
+use hyprtile::layout::grid::GridLayout;
+use hyprtile::layout::master_stack::{MasterStackConfig, MasterStackLayout, Orientation};
+use hyprtile::layout::monocle::MonocleLayout;
+use hyprtile::layout::*;
 use hyprtile::util::animation::*;
-use hyprtile::window::rules::{RuleEngine, window_matches_rule, class_matches, title_matches, process_matches};
+use hyprtile::util::rect::Rect;
+use hyprtile::window::model::*;
+use hyprtile::window::rules::{
+    RuleEngine, class_matches, process_matches, title_matches, window_matches_rule,
+};
+use hyprtile::workspace::model::*;
 
 // ============================================================================
 // 1. Rect Math Tests (8 tests)
@@ -55,15 +57,15 @@ fn test_rect_contains_point() {
 
     // Point inside
     assert!(r.contains((400, 300)));
-    assert!(r.contains((0, 0)));       // Top-left corner (inclusive)
-    assert!(r.contains((799, 599)));   // Bottom-right edge (inside)
+    assert!(r.contains((0, 0))); // Top-left corner (inclusive)
+    assert!(r.contains((799, 599))); // Bottom-right edge (inside)
 
     // Point outside
-    assert!(!r.contains((-1, 300)));   // Left of rect
-    assert!(!r.contains((800, 300)));  // Right of rect
-    assert!(!r.contains((400, -1)));   // Above rect
-    assert!(!r.contains((400, 600)));  // Below rect
-    assert!(!r.contains((800, 600)));  // Diagonal outside
+    assert!(!r.contains((-1, 300))); // Left of rect
+    assert!(!r.contains((800, 300))); // Right of rect
+    assert!(!r.contains((400, -1))); // Above rect
+    assert!(!r.contains((400, 600))); // Below rect
+    assert!(!r.contains((800, 600))); // Diagonal outside
 }
 
 #[test]
@@ -248,7 +250,12 @@ fn test_master_stack_two_masters() {
     use hyprtile::platform::window::WindowId;
 
     let workspace = Rect::new(0, 0, 1920, 1080);
-    let windows = vec![WindowId(1001), WindowId(1002), WindowId(1003), WindowId(1004)];
+    let windows = vec![
+        WindowId(1001),
+        WindowId(1002),
+        WindowId(1003),
+        WindowId(1004),
+    ];
 
     let config = MasterStackConfig {
         master_count: 2,
@@ -293,7 +300,12 @@ fn test_grid_four_windows() {
     use hyprtile::platform::window::WindowId;
 
     let workspace = Rect::new(0, 0, 1920, 1080);
-    let windows = vec![WindowId(1001), WindowId(1002), WindowId(1003), WindowId(1004)];
+    let windows = vec![
+        WindowId(1001),
+        WindowId(1002),
+        WindowId(1003),
+        WindowId(1004),
+    ];
 
     let result = GridLayout::calculate(&windows, &workspace, 0, 0, false);
 
@@ -312,9 +324,15 @@ fn test_grid_nine_windows() {
 
     let workspace = Rect::new(0, 0, 1920, 1080);
     let windows = vec![
-        WindowId(1001), WindowId(1002), WindowId(1003),
-        WindowId(1004), WindowId(1005), WindowId(1006),
-        WindowId(1007), WindowId(1008), WindowId(1009),
+        WindowId(1001),
+        WindowId(1002),
+        WindowId(1003),
+        WindowId(1004),
+        WindowId(1005),
+        WindowId(1006),
+        WindowId(1007),
+        WindowId(1008),
+        WindowId(1009),
     ];
 
     let result = GridLayout::calculate(&windows, &workspace, 0, 0, false);
@@ -323,8 +341,8 @@ fn test_grid_nine_windows() {
 
     // 9 windows = 3x3 grid
     let first_rect = result[0].1;
-    assert_eq!(first_rect.width, 640);   // 1920 / 3
-    assert_eq!(first_rect.height, 360);  // 1080 / 3
+    assert_eq!(first_rect.width, 640); // 1920 / 3
+    assert_eq!(first_rect.height, 360); // 1080 / 3
 }
 
 #[test]
@@ -335,8 +353,8 @@ fn test_gaps_application() {
     let with_gaps = apply_gaps(&r, 10);
     assert_eq!(with_gaps.x, 10);
     assert_eq!(with_gaps.y, 10);
-    assert_eq!(with_gaps.width, 980);   // 1000 - 20
-    assert_eq!(with_gaps.height, 580);  // 600 - 20
+    assert_eq!(with_gaps.width, 980); // 1000 - 20
+    assert_eq!(with_gaps.height, 580); // 600 - 20
 }
 
 #[test]
@@ -656,7 +674,10 @@ action = "float"
     assert_eq!(config.gaps.smart, false);
     assert_eq!(config.workspaces.count, 5);
     assert_eq!(config.window_rules.len(), 1);
-    assert_eq!(config.window_rules[0].match_class, Some("myapp".to_string()));
+    assert_eq!(
+        config.window_rules[0].match_class,
+        Some("myapp".to_string())
+    );
 }
 
 #[test]
@@ -687,7 +708,10 @@ fn test_config_serialization_roundtrip() {
     assert_eq!(parsed.gaps.outer, original.gaps.outer);
     assert_eq!(parsed.gaps.smart, original.gaps.smart);
     assert_eq!(parsed.workspaces.count, original.workspaces.count);
-    assert_eq!(parsed.workspaces.per_monitor, original.workspaces.per_monitor);
+    assert_eq!(
+        parsed.workspaces.per_monitor,
+        original.workspaces.per_monitor
+    );
 }
 
 // ============================================================================
@@ -1032,8 +1056,8 @@ fn test_interpolate_rect() {
 
     // At progress 0.5, should be halfway
     let r_half = interpolate_rect(&from, &to, 0.5);
-    assert_eq!(r_half.x, 50);     // (0 + 100) / 2
-    assert_eq!(r_half.y, 25);     // (0 + 50) / 2
+    assert_eq!(r_half.x, 50); // (0 + 100) / 2
+    assert_eq!(r_half.y, 25); // (0 + 50) / 2
     assert_eq!(r_half.width, 600); // (800 + 400) / 2
     assert_eq!(r_half.height, 450); // (600 + 300) / 2
 }
@@ -1083,7 +1107,10 @@ fn test_rule_title_match() {
     };
 
     assert!(window.matches_rule(&rule));
-    assert!(title_matches("Picture-in-Picture - YouTube", "Picture-in-Picture.*"));
+    assert!(title_matches(
+        "Picture-in-Picture - YouTube",
+        "Picture-in-Picture.*"
+    ));
 }
 
 #[test]
@@ -1197,7 +1224,10 @@ fn test_layout_type_all() {
 #[test]
 fn test_layout_type_from_name() {
     assert_eq!(LayoutType::from_name("dwindle"), Some(LayoutType::Dwindle));
-    assert_eq!(LayoutType::from_name("master_stack"), Some(LayoutType::MasterStack));
+    assert_eq!(
+        LayoutType::from_name("master_stack"),
+        Some(LayoutType::MasterStack)
+    );
     assert_eq!(LayoutType::from_name("monocle"), Some(LayoutType::Monocle));
     assert_eq!(LayoutType::from_name("grid"), Some(LayoutType::Grid));
     assert_eq!(LayoutType::from_name("nonexistent"), None);
@@ -1221,19 +1251,28 @@ fn test_easing_clamped() {
 
 #[test]
 fn test_config_mod_key_variants() {
-    let config_alt: Config = toml::from_str(r#"[general]
+    let config_alt: Config = toml::from_str(
+        r#"[general]
 mod_key = "ALT"
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     assert_eq!(config_alt.general.mod_key, ModKey::Alt);
 
-    let config_win: Config = toml::from_str(r#"[general]
+    let config_win: Config = toml::from_str(
+        r#"[general]
 mod_key = "WIN"
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     assert_eq!(config_win.general.mod_key, ModKey::Win);
 
-    let config_ctrl: Config = toml::from_str(r#"[general]
+    let config_ctrl: Config = toml::from_str(
+        r#"[general]
 mod_key = "CTRL"
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     assert_eq!(config_ctrl.general.mod_key, ModKey::Ctrl);
 }
 
@@ -1293,18 +1332,16 @@ fn test_gaps_effective_gaps_multi_window() {
 fn test_window_rule_engine() {
     use hyprtile::platform::window::WindowId;
 
-    let rules = vec![
-        WindowRule {
-            match_class: Some("Steam".to_string()),
-            match_title: None,
-            match_process: None,
-            action: Some(WindowAction::Float),
-            workspace: None,
-            monitor: None,
-            size: None,
-            position: None,
-        },
-    ];
+    let rules = vec![WindowRule {
+        match_class: Some("Steam".to_string()),
+        match_title: None,
+        match_process: None,
+        action: Some(WindowAction::Float),
+        workspace: None,
+        monitor: None,
+        size: None,
+        position: None,
+    }];
 
     let engine = RuleEngine::new(rules);
 

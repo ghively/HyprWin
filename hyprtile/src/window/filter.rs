@@ -142,17 +142,17 @@ pub fn passes_all_filters(hwnd: WindowId) -> bool {
 /// will never manage.
 pub fn system_window_classes() -> Vec<&'static str> {
     vec![
-        "Shell_TrayWnd",               // Primary taskbar
-        "Shell_SecondaryTrayWnd",      // Secondary taskbar (multi-monitor)
-        "Progman",                     // Program Manager desktop
-        "WorkerW",                     // Desktop worker window
-        "Windows.UI.Core.CoreWindow",  // UWP system windows (Start, Search)
-        "StartMenuExperienceHost",     // Windows Start Menu
-        "SearchHost",                  // Windows Search
-        "Shell_DesktopWnd",            // Desktop window
-        "SysListView32",               // Desktop icon list
-        "WorkerW",                     // DWM worker window (duplicate safe)
-        "NotifyIconOverflowWindow",    // System tray overflow
+        "Shell_TrayWnd",                       // Primary taskbar
+        "Shell_SecondaryTrayWnd",              // Secondary taskbar (multi-monitor)
+        "Progman",                             // Program Manager desktop
+        "WorkerW",                             // Desktop worker window
+        "Windows.UI.Core.CoreWindow",          // UWP system windows (Start, Search)
+        "StartMenuExperienceHost",             // Windows Start Menu
+        "SearchHost",                          // Windows Search
+        "Shell_DesktopWnd",                    // Desktop window
+        "SysListView32",                       // Desktop icon list
+        "WorkerW",                             // DWM worker window (duplicate safe)
+        "NotifyIconOverflowWindow",            // System tray overflow
         "TopLevelWindowForOverflowXamlIsland", // Xaml island overflow
     ]
 }
@@ -163,14 +163,14 @@ pub fn system_window_classes() -> Vec<&'static str> {
 /// top-level windows we never want to manage.
 pub fn excluded_processes() -> Vec<&'static str> {
     vec![
-        "explorer.exe",             // Windows Explorer / shell
-        "SearchHost.exe",           // Windows Search
+        "explorer.exe",                // Windows Explorer / shell
+        "SearchHost.exe",              // Windows Search
         "StartMenuExperienceHost.exe", // Start Menu
-        "ShellExperienceHost.exe",  // Shell experience (notifications, etc.)
-        "RuntimeBroker.exe",        // UWP broker
-        "TextInputHost.exe",        // Touch keyboard / emoji panel
-        "ApplicationFrameHost.exe", // UWP frame host
-        "SecurityHealthSystray.exe", // Windows Security tray
-        "CTFLoader.exe",            // CTF (Text Services Framework)
+        "ShellExperienceHost.exe",     // Shell experience (notifications, etc.)
+        "RuntimeBroker.exe",           // UWP broker
+        "TextInputHost.exe",           // Touch keyboard / emoji panel
+        "ApplicationFrameHost.exe",    // UWP frame host
+        "SecurityHealthSystray.exe",   // Windows Security tray
+        "CTFLoader.exe",               // CTF (Text Services Framework)
     ]
 }

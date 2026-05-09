@@ -3,21 +3,25 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use tracing::{debug, info, warn};
 use windows::Win32::Foundation::{BOOL, LPARAM, RECT, TRUE};
 use windows::Win32::Graphics::Gdi::{
-// ═══════════════════════════════════════════════════════════════════════════════
-// AI_AGENT_STOP: MONITOR_LIFECYCLE — Monitor enumeration and DPI awareness.
-// Before modifying monitor handling:
-//   1. set_dpi_awareness() MUST be called before any window enumeration.
-//   2. Per-monitor DPI requires GetDpiForMonitor, not GetDpiForSystem.
-//   3. Handle monitor disconnect by redistributing windows to remaining monitors.
-//   4. work_area excludes the taskbar — use it, not rect, for tiling area.
-//   5. Monitor IDs are assigned sequentially and may change on re-enumeration.
-// ═══════════════════════════════════════════════════════════════════════════════
-
-    EnumDisplayMonitors, GetMonitorInfoW, MonitorFromWindow, HMONITOR, MONITORINFO, MONITORINFOEXW,
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // AI_AGENT_STOP: MONITOR_LIFECYCLE — Monitor enumeration and DPI awareness.
+    // Before modifying monitor handling:
+    //   1. set_dpi_awareness() MUST be called before any window enumeration.
+    //   2. Per-monitor DPI requires GetDpiForMonitor, not GetDpiForSystem.
+    //   3. Handle monitor disconnect by redistributing windows to remaining monitors.
+    //   4. work_area excludes the taskbar — use it, not rect, for tiling area.
+    //   5. Monitor IDs are assigned sequentially and may change on re-enumeration.
+    // ═══════════════════════════════════════════════════════════════════════════════
+    EnumDisplayMonitors,
+    GetMonitorInfoW,
+    HMONITOR,
+    MONITORINFO,
+    MONITORINFOEXW,
+    MonitorFromWindow,
 };
 use windows::Win32::UI::HiDpi::{
-    GetDpiForMonitor, SetThreadDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
-    MDT_EFFECTIVE_DPI,
+    DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, GetDpiForMonitor, MDT_EFFECTIVE_DPI,
+    SetThreadDpiAwarenessContext,
 };
 use windows::Win32::UI::WindowsAndMessaging::MONITOR_DEFAULTTONEAREST;
 
@@ -70,7 +74,8 @@ impl Monitor {
         };
 
         unsafe {
-            let result = GetMonitorInfoW(HMONITOR(hmonitor), &mut info as *mut _ as *mut MONITORINFO);
+            let result =
+                GetMonitorInfoW(HMONITOR(hmonitor), &mut info as *mut _ as *mut MONITORINFO);
             if !result.as_bool() {
                 return None;
             }
@@ -197,13 +202,13 @@ pub fn set_dpi_awareness() {
 
 /// Register for display change notifications.
 pub fn register_display_change_notification() -> anyhow::Result<()> {
-    use windows::Win32::UI::WindowsAndMessaging::{
-        RegisterWindowMessageW, HWND_MESSAGE, CreateWindowExW, RegisterDeviceNotificationW,
-        WM_DEVICECHANGE, DEVICE_NOTIFY_WINDOW_HANDLE, DBT_DEVTYP_DEVICEINTERFACE,
-        GUID_DEVINTERFACE_MONITOR,
-    };
-    use windows::Win32::Foundation::HWND;
     use std::ptr::null_mut;
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CreateWindowExW, DBT_DEVTYP_DEVICEINTERFACE, DEVICE_NOTIFY_WINDOW_HANDLE,
+        GUID_DEVINTERFACE_MONITOR, HWND_MESSAGE, RegisterDeviceNotificationW,
+        RegisterWindowMessageW, WM_DEVICECHANGE,
+    };
 
     info!("Registering for display change notifications");
 
@@ -214,7 +219,10 @@ pub fn register_display_change_notification() -> anyhow::Result<()> {
             windows::w!("Message"),
             None,
             windows::Win32::UI::WindowsAndMessaging::WS_OVERLAPPED,
-            0, 0, 0, 0,
+            0,
+            0,
+            0,
+            0,
             HWND_MESSAGE,
             None,
             None,
@@ -223,7 +231,10 @@ pub fn register_display_change_notification() -> anyhow::Result<()> {
 
         let hwnd = match hwnd {
             Ok(h) => h,
-            Err(e) => anyhow::bail!("Failed to create message-only window for display notifications: {}", e),
+            Err(e) => anyhow::bail!(
+                "Failed to create message-only window for display notifications: {}",
+                e
+            ),
         };
 
         // Register for device notifications

@@ -74,9 +74,8 @@ impl TrayIcon {
         info!("Creating system tray icon");
 
         // Build the context menu
-        let menu = tray_icon::menu::Menu::new().map_err(|e| {
-            anyhow::anyhow!("Failed to create tray menu: {}", e)
-        })?;
+        let menu = tray_icon::menu::Menu::new()
+            .map_err(|e| anyhow::anyhow!("Failed to create tray menu: {}", e))?;
 
         let show_item = tray_icon::menu::MenuItem::new("Show", true, None);
         let reload_item = tray_icon::menu::MenuItem::new("Reload Config", true, None);
@@ -98,9 +97,8 @@ impl TrayIcon {
             .map_err(|e| anyhow::anyhow!("Failed to add Exit menu item: {}", e))?;
 
         // Create a simple icon from RGBA data
-        let icon = create_hyprtile_icon().map_err(|e| {
-            anyhow::anyhow!("Failed to create tray icon image: {}", e)
-        })?;
+        let icon = create_hyprtile_icon()
+            .map_err(|e| anyhow::anyhow!("Failed to create tray icon image: {}", e))?;
 
         let tray = tray_icon::TrayIconBuilder::new()
             .with_menu(Box::new(menu))
@@ -137,8 +135,7 @@ impl TrayIcon {
                             if let Some(a) = action {
                                 debug!("Tray action triggered: {:?}", a);
                                 let action_str = a.as_action_str().to_string();
-                                if let Err(e) = event_tx
-                                    .send(WindowEvent::HotkeyAction(action_str))
+                                if let Err(e) = event_tx.send(WindowEvent::HotkeyAction(action_str))
                                 {
                                     warn!("Failed to send tray action to event channel: {}", e);
                                     break;

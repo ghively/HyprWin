@@ -5,9 +5,9 @@
 //! secondary area. This is a classic tiling layout seen in many
 //! window managers such as dwm and XMonad.
 
+use super::gaps::apply_gaps;
 use crate::platform::window::WindowId;
 use crate::util::rect::Rect;
-use super::gaps::apply_gaps;
 use tracing::trace;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -94,10 +94,10 @@ impl MasterStackLayout {
         match config.orientation {
             Orientation::Horizontal => {
                 // Split workspace into master (left) and stack (right).
-                let master_width =
-                    ((rect.width as f64 * config.master_width_factor).round() as i32)
-                        .max(1)
-                        .min(rect.width.saturating_sub(1));
+                let master_width = ((rect.width as f64 * config.master_width_factor).round()
+                    as i32)
+                    .max(1)
+                    .min(rect.width.saturating_sub(1));
                 let stack_x = rect.x + master_width;
                 let stack_width = rect.width - master_width;
 
@@ -142,10 +142,10 @@ impl MasterStackLayout {
             }
             Orientation::Vertical => {
                 // Split workspace into master (top) and stack (bottom).
-                let master_height =
-                    ((rect.height as f64 * config.master_width_factor).round() as i32)
-                        .max(1)
-                        .min(rect.height.saturating_sub(1));
+                let master_height = ((rect.height as f64 * config.master_width_factor).round()
+                    as i32)
+                    .max(1)
+                    .min(rect.height.saturating_sub(1));
                 let stack_y = rect.y + master_height;
                 let stack_height = rect.height - master_height;
 
@@ -191,9 +191,7 @@ impl MasterStackLayout {
 
         trace!(
             window_count = results.len(),
-            master_count,
-            stack_count,
-            "master_stack layout calculated"
+            master_count, stack_count, "master_stack layout calculated"
         );
         results
     }
@@ -211,8 +209,7 @@ mod tests {
     fn test_master_stack_empty() {
         let workspace = Rect::new(0, 0, 1920, 1080);
         let config = MasterStackConfig::default();
-        let result =
-            MasterStackLayout::calculate(&[], &workspace, 8, 8, false, &config);
+        let result = MasterStackLayout::calculate(&[], &workspace, 8, 8, false, &config);
         assert!(result.is_empty());
     }
 
@@ -221,8 +218,7 @@ mod tests {
         let workspace = Rect::new(0, 0, 1000, 600);
         let windows = vec![wid(1)];
         let config = MasterStackConfig::default();
-        let result =
-            MasterStackLayout::calculate(&windows, &workspace, 0, 0, false, &config);
+        let result = MasterStackLayout::calculate(&windows, &workspace, 0, 0, false, &config);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].0, wid(1));
         // With 0 gaps, single master gets the full workspace
@@ -234,8 +230,7 @@ mod tests {
         let workspace = Rect::new(0, 0, 1000, 600);
         let windows = vec![wid(1), wid(2)];
         let config = MasterStackConfig::default();
-        let result =
-            MasterStackLayout::calculate(&windows, &workspace, 0, 0, false, &config);
+        let result = MasterStackLayout::calculate(&windows, &workspace, 0, 0, false, &config);
         assert_eq!(result.len(), 2);
 
         // Window 1 should be in the left half (master area, 50%)
@@ -259,8 +254,7 @@ mod tests {
             master_width_factor: 0.5,
             orientation: Orientation::Horizontal,
         };
-        let result =
-            MasterStackLayout::calculate(&windows, &workspace, 0, 0, false, &config);
+        let result = MasterStackLayout::calculate(&windows, &workspace, 0, 0, false, &config);
         assert_eq!(result.len(), 5);
 
         // First two are masters, rest are stack
@@ -278,8 +272,7 @@ mod tests {
             master_width_factor: 0.5,
             orientation: Orientation::Vertical,
         };
-        let result =
-            MasterStackLayout::calculate(&windows, &workspace, 0, 0, false, &config);
+        let result = MasterStackLayout::calculate(&windows, &workspace, 0, 0, false, &config);
         assert_eq!(result.len(), 2);
 
         // In vertical mode, master is on top, stack on bottom
@@ -305,8 +298,7 @@ mod tests {
         let workspace = Rect::new(0, 0, 1000, 600);
         let windows = vec![wid(1), wid(2)];
         let config = MasterStackConfig::default();
-        let result =
-            MasterStackLayout::calculate(&windows, &workspace, 8, 8, false, &config);
+        let result = MasterStackLayout::calculate(&windows, &workspace, 8, 8, false, &config);
         assert_eq!(result.len(), 2);
 
         // Both should have positive dimensions even with gaps

@@ -214,9 +214,7 @@ impl IpcServer {
     }
 
     /// Handle a single client connection: read request(s), respond.
-    async fn handle_client(
-        mut client: NamedPipeServer,
-    ) -> anyhow::Result<()> {
+    async fn handle_client(mut client: NamedPipeServer) -> anyhow::Result<()> {
         debug!("IPC client connected");
         let mut codec = JsonCodec;
         let mut buf = BytesMut::with_capacity(4096);
@@ -273,7 +271,10 @@ impl IpcServer {
 ///
 /// Each connection is handled in a separate task with newline-delimited JSON.
 /// The server listens for a shutdown notification to exit cleanly.
-pub async fn start_tcp_server(port: u16, shutdown: std::sync::Arc<tokio::sync::Notify>) -> anyhow::Result<()> {
+pub async fn start_tcp_server(
+    port: u16,
+    shutdown: std::sync::Arc<tokio::sync::Notify>,
+) -> anyhow::Result<()> {
     let addr = format!("127.0.0.1:{}", port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     info!("TCP IPC server listening on {}", addr);
@@ -430,7 +431,13 @@ mod tests {
     #[test]
     fn test_parse_request_workspaces() {
         let json = r#"{"command":"workspaces","monitor":1}"#;
-        let req = match parse_request(json.as_bytes()) { Ok(r) => r, Err(e) => { error!("Failed to parse request: {}", e); continue; } };
+        let req = match parse_request(json.as_bytes()) {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Failed to parse request: {}", e);
+                continue;
+            }
+        };
         match req {
             IpcRequest::Workspaces { monitor: Some(1) } => {}
             other => panic!("Expected Workspaces request, got: {:?}", other),
@@ -440,7 +447,13 @@ mod tests {
     #[test]
     fn test_parse_request_exit() {
         let json = r#"{"command":"exit"}"#;
-        let req = match parse_request(json.as_bytes()) { Ok(r) => r, Err(e) => { error!("Failed to parse request: {}", e); continue; } };
+        let req = match parse_request(json.as_bytes()) {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Failed to parse request: {}", e);
+                continue;
+            }
+        };
         match req {
             IpcRequest::Exit => {}
             other => panic!("Expected Exit request, got: {:?}", other),
@@ -451,7 +464,13 @@ mod tests {
     fn test_serialize_response_success() {
         let resp = IpcResponse::success(Some(serde_json::json!({"count": 42 })));
         let bytes = serialize_response(&resp);
-        let json_str = match String::from_utf8(bytes) { Ok(s) => s, Err(e) => { error!("Invalid UTF-8 in request: {}", e); continue; } };
+        let json_str = match String::from_utf8(bytes) {
+            Ok(s) => s,
+            Err(e) => {
+                error!("Invalid UTF-8 in request: {}", e);
+                continue;
+            }
+        };
         assert!(json_str.contains("\"success\":true"));
         assert!(json_str.contains("42"));
     }
@@ -460,7 +479,13 @@ mod tests {
     fn test_serialize_response_error() {
         let resp = IpcResponse::error("something went wrong");
         let bytes = serialize_response(&resp);
-        let json_str = match String::from_utf8(bytes) { Ok(s) => s, Err(e) => { error!("Invalid UTF-8 in request: {}", e); continue; } };
+        let json_str = match String::from_utf8(bytes) {
+            Ok(s) => s,
+            Err(e) => {
+                error!("Invalid UTF-8 in request: {}", e);
+                continue;
+            }
+        };
         assert!(json_str.contains("\"success\":false"));
         assert!(json_str.contains("something went wrong"));
     }

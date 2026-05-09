@@ -1,23 +1,32 @@
-use std::sync::mpsc::Sender;
 use std::sync::Mutex;
+use std::sync::mpsc::Sender;
 use std::thread;
 use std::time::Instant;
 use tracing::{debug, error, info, trace, warn};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Accessibility::{
-// ═══════════════════════════════════════════════════════════════════════════════
-// AI_AGENT_STOP: EVENT_CLASSIFICATION — Adding a new WinEventHook event?
-//   1. Add the raw Win32 constant to the match in classify_event().
-//   2. Add a new WindowEvent variant if it represents a new semantic event.
-//   3. Update event_hook_callback to route the raw event to classify_event().
-//   4. Consider debouncing — rapid events can flood the channel.
-//   5. Test with actual window operations to verify correct classification.
-// ═══════════════════════════════════════════════════════════════════════════════
-
-    SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK,
-    EVENT_OBJECT_CREATE, EVENT_OBJECT_DESTROY, EVENT_OBJECT_HIDE, EVENT_OBJECT_LOCATIONCHANGE,
-    EVENT_OBJECT_FOCUS, EVENT_OBJECT_NAMECHANGE, EVENT_OBJECT_SHOW, EVENT_SYSTEM_MINIMIZEEND,
-    EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZESTART,
+    EVENT_OBJECT_CREATE,
+    EVENT_OBJECT_DESTROY,
+    EVENT_OBJECT_FOCUS,
+    EVENT_OBJECT_HIDE,
+    EVENT_OBJECT_LOCATIONCHANGE,
+    EVENT_OBJECT_NAMECHANGE,
+    EVENT_OBJECT_SHOW,
+    EVENT_SYSTEM_MINIMIZEEND,
+    EVENT_SYSTEM_MINIMIZESTART,
+    EVENT_SYSTEM_MOVESIZEEND,
+    EVENT_SYSTEM_MOVESIZESTART,
+    HWINEVENTHOOK,
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // AI_AGENT_STOP: EVENT_CLASSIFICATION — Adding a new WinEventHook event?
+    //   1. Add the raw Win32 constant to the match in classify_event().
+    //   2. Add a new WindowEvent variant if it represents a new semantic event.
+    //   3. Update event_hook_callback to route the raw event to classify_event().
+    //   4. Consider debouncing — rapid events can flood the channel.
+    //   5. Test with actual window operations to verify correct classification.
+    // ═══════════════════════════════════════════════════════════════════════════════
+    SetWinEventHook,
+    UnhookWinEvent,
 };
 use windows::Win32::UI::WindowsAndMessaging::*;
 
@@ -140,7 +149,10 @@ pub extern "system" fn event_hook_callback(
     }
 
     if let Some(window_event) = classify_event(event, hwnd) {
-        trace!("Classified event: {:?} for hwnd=0x{:X}", window_event, hwnd.0);
+        trace!(
+            "Classified event: {:?} for hwnd=0x{:X}",
+            window_event, hwnd.0
+        );
 
         if let Ok(guard) = EVENT_SENDER.lock() {
             if let Some(tx) = guard.as_ref() {
@@ -205,7 +217,10 @@ pub fn start_event_loop(event_tx: Sender<WindowEvent>) -> anyhow::Result<()> {
                     windows::w!("Message"),
                     None,
                     WS_OVERLAPPED,
-                    0, 0, 0, 0,
+                    0,
+                    0,
+                    0,
+                    0,
                     HWND_MESSAGE,
                     None,
                     None,
@@ -288,10 +303,7 @@ impl EventDebouncer {
                     false
                 } else if event_count >= self.max_events {
                     // Inside window but event count exceeded — debounce
-                    debug!(
-                        "Debouncing {} events within {}ms",
-                        event_count, elapsed
-                    );
+                    debug!("Debouncing {} events within {}ms", event_count, elapsed);
                     true
                 } else {
                     // Inside window, count below threshold — allow

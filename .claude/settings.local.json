@@ -1,7 +1,20 @@
 {
   "permissions": {
     "allow": [
-      "Bash(Get-ChildItem *)"
+      "Bash(Get-ChildItem *)",
+      "PowerShell(gh *)",
+      "PowerShell(New-Item *)",
+      "Bash(git stash *)",
+      "Bash(git checkout *)",
+      "Bash(git push *)",
+      "Bash(git rm *)",
+      "Bash(git add *)",
+      "PowerShell(Test-Path \"C:\\\\Git\\\\WinHyprlnd\\\\stage1-util-config\", \"C:\\\\Git\\\\WinHyprlnd\\\\stage2-platform\", \"C:\\\\Git\\\\WinHyprlnd\\\\hyprtile-v0.1.0.zip\" | ForEach-Object { if \\($_\\) { \"EXISTS\" } else { \"NOT FOUND\" } })",
+      "Bash(git ls-remote *)",
+      "Bash(cat)",
+      "Read(//tmp/**)",
+      "Bash(cargo fmt *)",
+      "PowerShell(Test-Path *)"
     ]
   }
 }

@@ -2,13 +2,13 @@
 //!
 //! The dwindle layout arranges windows in a Fibonacci spiral pattern
 //! using a binary space partitioning tree. Each new window splits the
-///! smallest available region, alternating between horizontal and vertical
+//! smallest available region, alternating between horizontal and vertical
 //! splits.
 
-use crate::platform::window::WindowId;
-use crate::util::rect::Rect;
 use super::bsp::build_dwindle_tree;
 use super::gaps::{apply_gaps, effective_gaps};
+use crate::platform::window::WindowId;
+use crate::util::rect::Rect;
 use tracing::{debug, trace};
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -74,10 +74,7 @@ impl DwindleLayout {
             results.push((win_id, gap_adjusted));
         });
 
-        debug!(
-            window_count = results.len(),
-            "dwindle layout calculated"
-        );
+        debug!(window_count = results.len(), "dwindle layout calculated");
         results
     }
 }

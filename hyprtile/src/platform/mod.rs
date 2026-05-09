@@ -6,10 +6,10 @@
 //   3. Run tests after changes: cargo test
 // ═══════════════════════════════════════════════════════════════════════════════
 
-pub mod window;
-pub mod monitor;
-pub mod events;
 pub mod dwm;
+pub mod events;
 pub mod input;
+pub mod monitor;
 pub mod startup;
 pub mod tray;
+pub mod window;

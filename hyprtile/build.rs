@@ -15,7 +15,10 @@ fn main() {
 fn compile_windows_resources(out_dir: &PathBuf) {
     let rc_file = PathBuf::from("resources/hyprtile.rc");
     if !rc_file.exists() {
-        println!("cargo:warning=Resource file not found: {}", rc_file.display());
+        println!(
+            "cargo:warning=Resource file not found: {}",
+            rc_file.display()
+        );
         return;
     }
 
@@ -26,8 +29,7 @@ fn compile_windows_resources(out_dir: &PathBuf) {
 
     if target.contains("gnu") {
         // MinGW / GNU toolchain — use windres
-        let windres = env::var("WINDRES")
-            .unwrap_or_else(|_| "windres".to_string());
+        let windres = env::var("WINDRES").unwrap_or_else(|_| "windres".to_string());
 
         let status = Command::new(&windres)
             .arg("-O")
@@ -57,8 +59,7 @@ fn compile_windows_resources(out_dir: &PathBuf) {
         }
     } else {
         // MSVC toolchain — use rc.exe
-        let rc = env::var("RC")
-            .unwrap_or_else(|_| "rc.exe".to_string());
+        let rc = env::var("RC").unwrap_or_else(|_| "rc.exe".to_string());
 
         let status = Command::new(&rc)
             .arg("/fo")
