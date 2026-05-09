@@ -422,11 +422,16 @@ impl App {
             }
         };
 
+        let mut config_manager = ConfigManager::new()?;
+        if let Err(e) = config_manager.start_watching() {
+            warn!("Config file watcher could not be started: {}", e);
+        }
+
         Ok(App {
             state,
             event_tx,
             event_rx,
-            config_manager: ConfigManager::new()?, // placeholder
+            config_manager,
             config_path,
             tray,
         })
