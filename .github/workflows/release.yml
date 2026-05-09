@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag/version to publish (e.g. v0.1.0). When run manually, the tag is created from the current ref.'
+        description: 'Tag to create and publish (e.g. v0.1.0-rc.1). Tag is created at the workflow ref if it does not exist. A "-" in the name marks the release as a prerelease.'
         required: true
-        default: 'v0.1.0-dev'
+        default: 'v0.1.0-rc.1'
 
 permissions:
   contents: write
@@ -107,8 +107,14 @@ jobs:
             hyprtile/installer/HyprTile-${{ steps.ver.outputs.version }}-Setup.exe
             hyprtile/installer/HyprTile-${{ steps.ver.outputs.version }}-Setup.exe.sha256
 
+      # Publish a release for both real tag pushes and manual workflow_dispatch
+      # runs. softprops/action-gh-release creates the tag at the current SHA
+      # if it does not already exist, so the user can click "Run workflow"
+      # from the Actions UI to cut a release without pushing tags by hand.
       - name: Publish GitHub Release
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        if: |
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+          || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
