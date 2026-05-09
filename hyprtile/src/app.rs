@@ -12,9 +12,10 @@ use crate::platform::dwm::{BorderColors, set_border_color};
 use crate::platform::events::{EventHook, WindowEvent};
 use crate::platform::input::HotkeyManager;
 use crate::platform::monitor::{Monitor, enumerate_monitors, set_dpi_awareness};
+use crate::platform::shutdown::{current_thread_id, post_quit_to_thread, run_message_pump};
 use crate::platform::window::{
-    DeferredPositioner,
     WindowId,
+    apply_tiled_positions,
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     // AI_AGENT_STOP: APP_COORDINATOR â€” This is the central event dispatch loop.
     // Before modifying event handling:
@@ -39,11 +40,6 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::Notify;
 use tracing::{debug, error, info, warn};
-use windows::Win32::Foundation::{LPARAM, WPARAM};
-use windows::Win32::System::Threading::GetCurrentThreadId;
-use windows::Win32::UI::WindowsAndMessaging::{
-    PostThreadMessageW, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOCOPYBITS, SWP_SHOWWINDOW, WM_QUIT,
-};
 
 // ---------------------------------------------------------------------------
 // AppState -- shared mutable state accessible from IPC handlers
@@ -243,17 +239,11 @@ impl AppState {
             );
         }
 
-        // Apply positions via deferred positioner
-        let flags = SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_NOCOPYBITS | SWP_SHOWWINDOW;
-        let count = i32::try_from(positions.len()).unwrap_or(i32::MAX);
-        let mut positioner = DeferredPositioner::new(count);
-
+        // Apply positions via the platform-layer batch helper.
         for (window_id, rect) in &positions {
             debug!("  Positioning window {:?} at {:?}", window_id, rect);
-            positioner.defer(window_id.as_raw(), rect, flags);
         }
-
-        if !positioner.commit() {
+        if !apply_tiled_positions(&positions) {
             warn!(
                 "Deferred window position commit failed on monitor {}",
                 monitor_id
@@ -459,33 +449,14 @@ impl App {
             .name("event-hook".to_string())
             .spawn(move || {
                 // Store this thread's Win32 ID so the main thread can post WM_QUIT
-                unsafe {
-                    hook_thread_id_inner
-                        .store(GetCurrentThreadId(), std::sync::atomic::Ordering::SeqCst);
-                }
+                hook_thread_id_inner
+                    .store(current_thread_id(), std::sync::atomic::Ordering::SeqCst);
                 match EventHook::register(event_tx_for_hook) {
                     Ok(hook) => {
                         info!("WinEventHook registered");
                         // The hook callback runs on the same thread; keep it alive
-                        // by running a message loop
-                        loop {
-                            unsafe {
-                                let mut msg = std::mem::zeroed();
-                                if windows::Win32::UI::WindowsAndMessaging::GetMessageW(
-                                    &mut msg, None, 0, 0,
-                                )
-                                .0 > 0
-                                {
-                                    let _ =
-                                        windows::Win32::UI::WindowsAndMessaging::TranslateMessage(
-                                            &msg,
-                                        );
-                                    windows::Win32::UI::WindowsAndMessaging::DispatchMessageW(&msg);
-                                } else {
-                                    break;
-                                }
-                            }
-                        }
+                        // by running a Win32 message pump until WM_QUIT.
+                        run_message_pump();
                         hook.unregister();
                     }
                     Err(e) => {
@@ -591,13 +562,8 @@ impl App {
         hotkey_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
         self.state.tcp_shutdown.notify_waiters();
 
-        // Signal the hook thread to exit by posting WM_QUIT to its Win32 message queue
-        let hook_tid = hook_thread_id.load(std::sync::atomic::Ordering::SeqCst);
-        if hook_tid != 0 {
-            unsafe {
-                let _ = PostThreadMessageW(hook_tid, WM_QUIT, WPARAM(0), LPARAM(0));
-            }
-        }
+        // Signal the hook thread to exit by posting WM_QUIT to its Win32 message queue.
+        post_quit_to_thread(hook_thread_id.load(std::sync::atomic::Ordering::SeqCst));
 
         // Join worker threads with a timeout to avoid hanging forever
         let _join_timeout = Duration::from_secs(2);

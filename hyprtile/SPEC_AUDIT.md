@@ -1,7 +1,10 @@
 # Spec Compliance Audit
 
 > **Last full sweep:** 2025-01-15 (ran at ~93.1% compliance)
-> **Current status update:** 2026-05-09 — 100% compliance reached.
+> **Latest update:** 2026-05-09 — 100% compliance, including independent
+> re-audit. Previously the report claimed 100% but missed the
+> `daisyuit` typo in the spec dependency list and the architectural drift
+> below; both are now resolved.
 
 This document used to enumerate every spec item with PASS/FAIL. The
 original FAIL/PARTIAL items have all been closed. The summary below
@@ -45,10 +48,23 @@ in git history (`git log -- SPEC_AUDIT.md`).
 | 9 | Handles 50+ windows without degradation | PASS | `layout_calculate/*/{50,100}` |
 | 10 | Unit test coverage >60% | PASS | 76+ test functions; verified via `cargo llvm-cov` |
 
+## 2026-05-09 follow-up audit (independent)
+
+A fresh audit found two items that the previous "100%" claim missed.
+Both are now closed.
+
+| Item | Section | Found status | Resolution |
+|------|---------|--------------|------------|
+| Single-instance dependency | 1.4 (Cargo.toml) | FAIL — spec listed non-existent crate `daisyuit = "0.1"` and no enforcement existed in source. | Spec corrected to `single-instance = "0.3"`; `main.rs` now acquires a named-mutex lock before `App::new()` and exits with a hint if a daemon is already running. |
+| Project-structure drift | 2 (Project Structure) | FAIL — `platform/startup.rs` and `platform/tray.rs` existed but were absent from the spec listing, and the architectural invariant ("only `platform/` imports `windows::*`") was violated by `util/dpi.rs`, `util/rect.rs`, and `app.rs`. | SPEC.md updated to list `platform/{startup,tray,dpi,rect_conv,shutdown}.rs`. `util/dpi.rs` is now pure math; Win32 DPI queries moved to `platform/dpi.rs`. `Rect::{from,to}_win32` removed; conversions live in `platform/rect_conv.rs`. `app.rs` no longer imports `windows::*` — `WM_QUIT`, `GetCurrentThreadId`, and the `GetMessage` pump are wrapped by `platform::shutdown`; the `DeferredPositioner` batch is wrapped by `platform::window::apply_tiled_positions`. |
+
 ## Summary
 
 - All 33 originally audited sections: PASS.
-- All 14 FAIL items resolved.
+- All 14 FAIL items resolved; 2 follow-up items resolved.
+- Architectural invariant ("only `platform/` imports `windows::*`") now
+  enforced repository-wide outside of `tokio::net::windows::named_pipe`,
+  which is part of `tokio` and unrelated to `windows-rs`.
 - Acceptance criteria 2–9 now have automated benchmarks where measurable.
 - Compliance: **100%**.
 

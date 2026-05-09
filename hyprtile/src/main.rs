@@ -149,6 +149,23 @@ fn main() {
         return;
     }
 
+    // Single-instance guard: only one HyprTile daemon may run at a time.
+    // The lock is released when `_instance` is dropped at process exit.
+    let _instance = match single_instance::SingleInstance::new("HyprTile-Daemon-Mutex") {
+        Ok(inst) if inst.is_single() => inst,
+        Ok(_) => {
+            error!(
+                "Another HyprTile instance is already running. \
+                 Use `hyprtile --command \"<cmd>\"` to talk to it."
+            );
+            std::process::exit(1);
+        }
+        Err(e) => {
+            error!("Failed to acquire single-instance lock: {}", e);
+            std::process::exit(1);
+        }
+    };
+
     // Create and run the main application
     match App::new(cli.config) {
         Ok(mut app) => {

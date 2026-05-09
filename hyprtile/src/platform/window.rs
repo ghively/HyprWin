@@ -9,6 +9,7 @@ use windows::Win32::System::ProcessStatus::GetProcessImageFileNameW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{SetActiveWindow, SetFocus};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
+use crate::platform::rect_conv::rect_from_win32;
 use crate::util::rect::Rect;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -379,7 +380,7 @@ pub fn get_extended_frame_bounds(hwnd: HWND) -> Option<Rect> {
             mem::size_of::<RECT>() as u32,
         );
         if result.is_ok() {
-            Some(Rect::from_win32(&rect))
+            Some(rect_from_win32(&rect))
         } else {
             None
         }
@@ -542,10 +543,24 @@ fn get_window_rect(hwnd: HWND) -> Option<Rect> {
     };
     let result = unsafe { GetWindowRect(hwnd, &mut rect) };
     if result.is_ok() {
-        Some(Rect::from_win32(&rect))
+        Some(rect_from_win32(&rect))
     } else {
         None
     }
+}
+
+/// Apply a batch of window positions for the active tiling layout.
+///
+/// Wraps [`DeferredPositioner`] so callers outside `platform/` do not need
+/// to import any Win32 types or `SET_WINDOW_POS_FLAGS` constants.
+/// Returns `true` if every position was committed.
+pub fn apply_tiled_positions(positions: &[(WindowId, Rect)]) -> bool {
+    let count = i32::try_from(positions.len()).unwrap_or(i32::MAX);
+    let mut positioner = DeferredPositioner::new(count);
+    for (window_id, rect) in positions {
+        positioner.defer(window_id.as_raw(), rect, SET_WINDOW_POS_FLAGS(0));
+    }
+    positioner.commit()
 }
 
 fn get_window_text(hwnd: HWND) -> String {

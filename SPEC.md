@@ -89,7 +89,7 @@ tray-icon = "0.19"
 global-hotkey = "0.6"
 
 # Single instance
-daisyuit = "0.1"
+single-instance = "0.3"
 
 [dev-dependencies]
 mockall = "0.13"
@@ -134,7 +134,12 @@ hyprtile/
 │   │   ├── monitor.rs       # Monitor enumeration and DPI
 │   │   ├── events.rs        # WinEventHook
 │   │   ├── dwm.rs           # DWM API wrappers
-│   │   └── input.rs         # Raw input, hotkey
+│   │   ├── input.rs         # Raw input, hotkey
+│   │   ├── dpi.rs           # Win32 DPI queries (GetDpiForMonitor)
+│   │   ├── rect_conv.rs     # Win32 RECT ↔ Rect conversion
+│   │   ├── shutdown.rs      # Worker-thread WM_QUIT helpers
+│   │   ├── startup.rs       # Run-on-login registration
+│   │   └── tray.rs          # System tray icon
 │   ├── layout/
 │   │   ├── mod.rs           # Layout coordinator
 │   │   ├── bsp.rs           # BSP tree
