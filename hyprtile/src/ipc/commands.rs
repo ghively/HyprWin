@@ -391,12 +391,16 @@ fn handle_switch_workspace(id: u32, state: &mut AppState) -> IpcResponse {
         return IpcResponse::error(format!("Failed to switch workspace: {}", e));
     }
 
-    // Show windows on the new workspace, hide on the old
-    if let Some(monitor_ws) = state.workspace_manager.monitors.get(&monitor_id)
-        && let Some(ws) = monitor_ws.get_workspace(id)
-    {
-        for &win_id in &ws.windows {
-            crate::platform::window::show_window(win_id.as_raw(), true);
+    if let Some(mon_ws) = state.workspace_manager.monitors.get(&monitor_id) {
+        for ws in &mon_ws.workspaces {
+            let visible = ws.id == id;
+            for &win_id in &ws.windows {
+                if let Some(window) = state.window_manager.get_window(win_id)
+                    && window.is_visible_and_managed()
+                {
+                    crate::platform::window::show_window(win_id.as_raw(), visible);
+                }
+            }
         }
     }
 

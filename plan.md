@@ -44,3 +44,8 @@ In every .rs file, at every major decision point:
 In every folder: `.ai_stop.md` describing what an AI agent should know before modifying files in that folder.
 
 ### Stage 5: Final Assembly & Commit
+Resolved 2026-05-09:
+- All BUG_HUNT items closed (see `hyprtile/BUG_HUNT.md`).
+- All SPEC_AUDIT FAIL items closed; compliance 100% (see `hyprtile/SPEC_AUDIT.md`).
+- `benches/perf.rs` (criterion) covers acceptance criteria 2-9 where pure-Rust measurable.
+- `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test` all green on `x86_64-pc-windows-gnu`.

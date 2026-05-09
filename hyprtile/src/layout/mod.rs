@@ -334,7 +334,7 @@ mod tests {
     #[test]
     fn test_calculate_layout_grid() {
         let workspace = Rect::new(0, 0, 1000, 600);
-        let windows: Vec<WindowId> = (1..=4).map(|n| wid(n)).collect();
+        let windows: Vec<WindowId> = (1..=4).map(wid).collect();
         let gaps = test_gaps();
         let result = calculate_layout(LayoutType::Grid, &windows, &workspace, &gaps, 0, 0.5);
         assert_eq!(result.len(), 4);

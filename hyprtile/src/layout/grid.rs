@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn test_grid_four_windows() {
         let workspace = Rect::new(0, 0, 1000, 600);
-        let windows: Vec<WindowId> = (1..=4).map(|n| wid(n)).collect();
+        let windows: Vec<WindowId> = (1..=4).map(wid).collect();
         let result = GridLayout::calculate(&windows, &workspace, 0, 0, false);
         assert_eq!(result.len(), 4);
 
@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn test_grid_positive_sizes() {
         let workspace = Rect::new(0, 0, 1920, 1080);
-        let windows: Vec<WindowId> = (1..=12).map(|n| wid(n)).collect();
+        let windows: Vec<WindowId> = (1..=12).map(wid).collect();
         let result = GridLayout::calculate(&windows, &workspace, 8, 8, false);
         assert_eq!(result.len(), 12);
 

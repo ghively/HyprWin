@@ -137,10 +137,7 @@ pub fn should_manage_window(hwnd: HWND) -> bool {
     }
 
     if !style.contains(WS_CAPTION) && !style.contains(WS_THICKFRAME) {
-        let class = get_class_name_for_window(hwnd);
-        if class != "ApplicationFrameWindow" && class != "Windows.UI.Core.CoreWindow" {
-            return false;
-        }
+        return false;
     }
 
     if ex_style.contains(WS_EX_TOOLWINDOW) {
@@ -164,33 +161,13 @@ pub fn should_manage_window(hwnd: HWND) -> bool {
 }
 
 /// Check if a window is a known system window (taskbar, desktop, etc.).
+///
+/// Single source of truth lives in [`crate::window::filter::system_window_classes`].
 pub fn is_system_window(hwnd: HWND) -> bool {
     if hwnd.is_invalid() {
         return false;
     }
-
-    let class = get_class_name_for_window(hwnd);
-
-    let system_classes: &[&str] = &[
-        "Shell_TrayWnd",
-        "Shell_SecondaryTrayWnd",
-        "Progman",
-        "WorkerW",
-        "ImmersiveLauncher",
-        "ImmersiveBackgroundWindow",
-        "Windows.UI.Core.CoreWindow",
-        "SearchBox",
-        "XamlExplorerHostIslandWindow",
-        "WindowsDashboard",
-        "TopLevelWindowForOverflowXamlIsland",
-        "ForegroundStaging",
-        "MultitaskingViewFrame",
-        "Microsoft-Windows-SnipperToolbar",
-        "NotifyIconOverflowWindow",
-        "Shell_DesktopWindow",
-    ];
-
-    system_classes.contains(&class.as_str())
+    crate::window::filter::is_system_window(WindowId::from_raw(hwnd))
 }
 
 /// Check if a window is cloaked by DWM.

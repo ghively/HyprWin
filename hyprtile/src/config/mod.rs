@@ -218,13 +218,18 @@ impl ConfigManager {
         let mut watcher: RecommendedWatcher = watcher;
 
         // Watch the parent directory so we catch renames/overwrites.
-        let watch_dir = self.config_path.parent().unwrap_or_else(|| Path::new("."));
+        // If the config path has no parent (e.g. drive root on Windows),
+        // watch the file directly so atomic-rename editors still work.
+        let watch_target: &Path = match self.config_path.parent() {
+            Some(p) if !p.as_os_str().is_empty() => p,
+            _ => self.config_path.as_path(),
+        };
         watcher
-            .watch(watch_dir, RecursiveMode::NonRecursive)
-            .context("failed to start watching config directory")?;
+            .watch(watch_target, RecursiveMode::NonRecursive)
+            .context("failed to start watching config path")?;
 
         self._watcher = Some(watcher);
-        info!("Started watching config directory: {}", watch_dir.display());
+        info!("Started watching config path: {}", watch_target.display());
 
         Ok(())
     }

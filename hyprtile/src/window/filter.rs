@@ -149,11 +149,19 @@ pub fn system_window_classes() -> Vec<&'static str> {
         "Windows.UI.Core.CoreWindow",          // UWP system windows (Start, Search)
         "StartMenuExperienceHost",             // Windows Start Menu
         "SearchHost",                          // Windows Search
+        "SearchBox",                           // Windows search box
         "Shell_DesktopWnd",                    // Desktop window
+        "Shell_DesktopWindow",                 // Desktop window (alt class)
         "SysListView32",                       // Desktop icon list
-        "WorkerW",                             // DWM worker window (duplicate safe)
         "NotifyIconOverflowWindow",            // System tray overflow
         "TopLevelWindowForOverflowXamlIsland", // Xaml island overflow
+        "ImmersiveLauncher",                   // Start menu launcher
+        "ImmersiveBackgroundWindow",           // Immersive background
+        "XamlExplorerHostIslandWindow",        // Xaml explorer host
+        "WindowsDashboard",                    // Windows dashboard
+        "ForegroundStaging",                   // Foreground staging surface
+        "MultitaskingViewFrame",               // Task View frame
+        "Microsoft-Windows-SnipperToolbar",    // Snipping tool toolbar
     ]
 }
 

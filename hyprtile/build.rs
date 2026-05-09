@@ -1,14 +1,20 @@
 use std::env;
-use std::path::{Path, PathBuf};
+#[cfg(windows)]
+use std::path::Path;
+#[cfg(windows)]
+use std::path::PathBuf;
+#[cfg(windows)]
 use std::process::Command;
 
 fn main() {
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     println!("cargo:rustc-env=VERSION={}", env!("CARGO_PKG_VERSION"));
     println!("cargo:rerun-if-changed=build.rs");
 
     #[cfg(windows)]
-    compile_windows_resources(&out_dir);
+    {
+        let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+        compile_windows_resources(&out_dir);
+    }
 }
 
 #[cfg(windows)]

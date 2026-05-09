@@ -122,7 +122,7 @@ mod tests {
     #[test]
     fn test_dwindle_many_windows() {
         let workspace = Rect::new(0, 0, 1920, 1080);
-        let windows: Vec<WindowId> = (1..=10).map(|n| wid(n)).collect();
+        let windows: Vec<WindowId> = (1..=10).map(wid).collect();
         let result = DwindleLayout::calculate(&windows, &workspace, 8, 8, false);
         assert_eq!(result.len(), 10);
 

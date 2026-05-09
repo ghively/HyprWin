@@ -94,6 +94,15 @@ impl Window {
         let is_electron = class_name == "Chrome_WidgetWin_1";
         let is_tool = id.is_tool_window();
 
+        // Only capture the current rect as the float-restore target when the
+        // window is in a normal visible state. Minimized/cloaked windows often
+        // report (0,0,0,0) which would later restore them to a degenerate rect.
+        let initial_floating_rect = if id.is_visible() && !id.is_iconic() {
+            id.get_rect()
+        } else {
+            None
+        };
+
         let mut win = Self {
             id,
             state: WindowState::Tiling,
@@ -101,7 +110,7 @@ impl Window {
             class_name,
             title,
             process_name,
-            floating_rect: id.get_rect(),
+            floating_rect: initial_floating_rect,
             is_managed: true,
             is_uwp,
             is_electron,
