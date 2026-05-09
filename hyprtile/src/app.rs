@@ -434,6 +434,7 @@ impl App {
             config_manager,
             config_path,
             tray,
+            hotkey_manager: None,
         })
     }
 
