@@ -107,5 +107,14 @@ cargo bench
 
 ---
 
-*All originally documented bugs are resolved. Re-open by appending a new
-section if a regression is observed.*
+## 2026-05-09 — Independent re-audit findings (all resolved)
+
+| # | Location | Issue | Resolution |
+|---|----------|-------|------------|
+| 28 | `src/util/dpi.rs:1` | Imported `windows::Win32::UI::HiDpi::*` and called `GetDpiForMonitor` / `GetDpiForSystem` directly — violates CLAUDE.md invariant 4 ("only `platform/` imports `windows::*`"). | Win32 queries moved to `src/platform/dpi.rs`; `util/dpi.rs` is now pure math. |
+| 29 | `src/util/rect.rs:2`, `:189` | `Rect::from_win32` / `Rect::to_win32` and `rect_from_monitor_work_area` leaked `RECT` into the pure geometry module. | Conversions moved to `src/platform/rect_conv.rs::{rect_from_win32, rect_to_win32}`; dead `rect_from_monitor_work_area` deleted; callers in `platform/{monitor,window}.rs` updated. |
+| 30 | `src/app.rs:42-46` | Imported `LPARAM`, `WPARAM`, `GetCurrentThreadId`, `PostThreadMessageW`, `WM_QUIT`, `SWP_*`, plus an inline `GetMessage` pump — same invariant. | New `platform::shutdown` exposes `current_thread_id`, `post_quit_to_thread`, `run_message_pump`. New `platform::window::apply_tiled_positions` wraps the `DeferredPositioner` batch. `app.rs` no longer imports `windows::*`. |
+| 31 | Spec deps + missing enforcement | `SPEC.md` listed `daisyuit = "0.1"` (typo for a non-existent crate); single-instance enforcement was therefore unimplemented, allowing two daemons to run concurrently. | `Cargo.toml` adds `single-instance = "0.3"`; `main.rs` acquires `SingleInstance::new("HyprTile-Daemon-Mutex")` before constructing `App`; spec updated to match. |
+
+*All originally documented bugs are resolved, plus the four follow-up
+items above. Re-open by appending a new section if a regression is observed.*

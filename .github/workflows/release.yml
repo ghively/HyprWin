@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create and publish (e.g. v0.1.0-rc.1). Tag is created at the workflow ref if it does not exist. A "-" in the name marks the release as a prerelease.'
+        required: true
+        default: 'v0.1.0-rc.1'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build installer (Windows x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = if ('${{ github.event_name }}' -eq 'push') { '${{ github.ref_name }}' } else { '${{ inputs.tag }}' }
+          $clean = $tag -replace '^v',''
+          "tag=$tag"     | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "version=$clean" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Tag: $tag  Version: $clean"
+
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            hyprtile/target
+          key: cargo-release-${{ runner.os }}-${{ hashFiles('hyprtile/Cargo.lock') }}
+
+      - name: Build release binary
+        run: cargo build --manifest-path hyprtile/Cargo.toml --release --locked
+
+      - name: Smoke-check binary
+        shell: pwsh
+        run: |
+          $exe = "hyprtile/target/release/hyprtile.exe"
+          if (-not (Test-Path $exe)) { throw "hyprtile.exe missing" }
+          & $exe --version
+          & $exe --print-default-config | Out-Null
+
+      - name: Stage portable zip
+        shell: pwsh
+        run: |
+          $stage = "stage"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item hyprtile/target/release/hyprtile.exe $stage
+          Copy-Item LICENSE $stage
+          Copy-Item hyprtile/README.md $stage
+          New-Item -ItemType Directory -Force -Path "$stage/docs" | Out-Null
+          Copy-Item hyprtile/docs/CONFIGURATION.md $stage/docs
+          Copy-Item hyprtile/docs/IPC_PROTOCOL.md $stage/docs
+          $zip = "HyprTile-${{ steps.ver.outputs.version }}-x64-portable.zip"
+          Compress-Archive -Path "$stage/*" -DestinationPath $zip -Force
+          "ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Compute zip SHA256
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash $env:ZIP -Algorithm SHA256).Hash.ToLower()
+          "$hash  $env:ZIP" | Out-File -FilePath "$env:ZIP.sha256"
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --version=6.2.2 --no-progress -y
+
+      - name: Compile installer (Inno Setup)
+        shell: pwsh
+        working-directory: hyprtile/installer
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found" }
+          & $iscc /DMyAppVersion=${{ steps.ver.outputs.version }} hyprtile.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compile failed" }
+
+      - name: Compute installer SHA256
+        shell: pwsh
+        run: |
+          $setup = "hyprtile/installer/HyprTile-${{ steps.ver.outputs.version }}-Setup.exe"
+          if (-not (Test-Path $setup)) { throw "Installer not produced: $setup" }
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+          "$hash  $(Split-Path -Leaf $setup)" | Out-File -FilePath "$setup.sha256"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyprtile-${{ steps.ver.outputs.version }}-windows-x64
+          path: |
+            HyprTile-${{ steps.ver.outputs.version }}-x64-portable.zip
+            HyprTile-${{ steps.ver.outputs.version }}-x64-portable.zip.sha256
+            hyprtile/installer/HyprTile-${{ steps.ver.outputs.version }}-Setup.exe
+            hyprtile/installer/HyprTile-${{ steps.ver.outputs.version }}-Setup.exe.sha256
+
+      # Publish a release for both real tag pushes and manual workflow_dispatch
+      # runs. softprops/action-gh-release creates the tag at the current SHA
+      # if it does not already exist, so the user can click "Run workflow"
+      # from the Actions UI to cut a release without pushing tags by hand.
+      - name: Publish GitHub Release
+        if: |
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+          || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: HyprTile ${{ steps.ver.outputs.tag }}
+          draft: false
+          prerelease: ${{ contains(steps.ver.outputs.tag, '-') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            HyprTile-${{ steps.ver.outputs.version }}-x64-portable.zip
+            HyprTile-${{ steps.ver.outputs.version }}-x64-portable.zip.sha256
+            hyprtile/installer/HyprTile-${{ steps.ver.outputs.version }}-Setup.exe
+            hyprtile/installer/HyprTile-${{ steps.ver.outputs.version }}-Setup.exe.sha256

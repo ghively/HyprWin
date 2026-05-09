@@ -1,11 +1,11 @@
 use serde::{Deserialize, Serialize};
-use windows::Win32::Foundation::RECT;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AI_AGENT_STOP: RECT_MATH — Fundamental rectangle operations.
 // Before modifying rect behavior:
 //   1. All operations must preserve invariants: width >= 1, height >= 1.
-//   2. from_win32()/to_win32() handle RECT ↔ Rect conversion.
+//   2. This module is platform-agnostic. Win32 RECT conversion lives in
+//      `platform::rect_conv` (`rect_from_win32`, `rect_to_win32`).
 //   3. split_horizontal() creates left/right; split_vertical() creates top/bottom.
 //   4. inset() and adjust_for_gaps() clamp to minimum 1 pixel.
 //   5. These are hot-path functions — keep them simple and fast.
@@ -28,29 +28,6 @@ impl Rect {
             y,
             width,
             height,
-        }
-    }
-
-    /// Convert from a Win32 `RECT` to a `Rect`.
-    ///
-    /// The Win32 `RECT` uses left/top/right/bottom, so width is `right - left`
-    /// and height is `bottom - top`.
-    pub fn from_win32(rect: &RECT) -> Self {
-        Self {
-            x: rect.left,
-            y: rect.top,
-            width: rect.right - rect.left,
-            height: rect.bottom - rect.top,
-        }
-    }
-
-    /// Convert this `Rect` to a Win32 `RECT`.
-    pub fn to_win32(&self) -> RECT {
-        RECT {
-            left: self.x,
-            top: self.y,
-            right: self.x + self.width,
-            bottom: self.y + self.height,
         }
     }
 
@@ -183,13 +160,6 @@ impl Point {
     }
 }
 
-/// Create a `Rect` from a monitor work area `RECT`.
-///
-/// The work area excludes the taskbar and other reserved screen space.
-pub fn rect_from_monitor_work_area(work_area: &RECT) -> Rect {
-    Rect::from_win32(work_area)
-}
-
 /// Center a window of the given size within a container rectangle.
 ///
 /// Returns a `Rect` representing the centered window's position and size.
@@ -216,31 +186,6 @@ mod tests {
         assert_eq!(r.y, 20);
         assert_eq!(r.width, 100);
         assert_eq!(r.height, 200);
-    }
-
-    #[test]
-    fn test_rect_from_win32() {
-        let rect = RECT {
-            left: 10,
-            top: 20,
-            right: 110,
-            bottom: 220,
-        };
-        let r = Rect::from_win32(&rect);
-        assert_eq!(r.x, 10);
-        assert_eq!(r.y, 20);
-        assert_eq!(r.width, 100);
-        assert_eq!(r.height, 200);
-    }
-
-    #[test]
-    fn test_rect_to_win32() {
-        let r = Rect::new(10, 20, 100, 200);
-        let rect = r.to_win32();
-        assert_eq!(rect.left, 10);
-        assert_eq!(rect.top, 20);
-        assert_eq!(rect.right, 110);
-        assert_eq!(rect.bottom, 220);
     }
 
     #[test]

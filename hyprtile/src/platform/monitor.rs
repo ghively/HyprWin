@@ -26,6 +26,7 @@ use windows::Win32::UI::HiDpi::{
     SetThreadDpiAwarenessContext,
 };
 
+use crate::platform::rect_conv::rect_from_win32;
 use crate::util::rect::Rect;
 
 /// Represents a display monitor with its properties.
@@ -82,8 +83,8 @@ impl Monitor {
             }
         }
 
-        let rect = Rect::from_win32(&info.monitorInfo.rcMonitor);
-        let work_area = Rect::from_win32(&info.monitorInfo.rcWork);
+        let rect = rect_from_win32(&info.monitorInfo.rcMonitor);
+        let work_area = rect_from_win32(&info.monitorInfo.rcWork);
         let is_primary = info.monitorInfo.dwFlags == 1;
         let name = String::from_utf16_lossy(
             &info.szDevice[..info.szDevice.iter().position(|&c| c == 0).unwrap_or(32)],
