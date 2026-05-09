@@ -1,5 +1,5 @@
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn main() {
@@ -12,7 +12,7 @@ fn main() {
 }
 
 #[cfg(windows)]
-fn compile_windows_resources(out_dir: &PathBuf) {
+fn compile_windows_resources(out_dir: &Path) {
     let rc_file = PathBuf::from("resources/hyprtile.rc");
     if !rc_file.exists() {
         println!(

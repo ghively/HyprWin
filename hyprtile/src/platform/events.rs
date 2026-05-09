@@ -5,18 +5,6 @@ use std::time::Instant;
 use tracing::{debug, error, info, trace, warn};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Accessibility::{
-    EVENT_OBJECT_CREATE,
-    EVENT_OBJECT_DESTROY,
-    EVENT_OBJECT_FOCUS,
-    EVENT_OBJECT_HIDE,
-    EVENT_OBJECT_LOCATIONCHANGE,
-    EVENT_OBJECT_NAMECHANGE,
-    EVENT_OBJECT_SHOW,
-    EVENT_SYSTEM_MINIMIZEEND,
-    EVENT_SYSTEM_MINIMIZESTART,
-    EVENT_SYSTEM_MOVESIZEEND,
-    EVENT_SYSTEM_MOVESIZESTART,
-    HWINEVENTHOOK,
     // ═══════════════════════════════════════════════════════════════════════════════
     // AI_AGENT_STOP: EVENT_CLASSIFICATION — Adding a new WinEventHook event?
     //   1. Add the raw Win32 constant to the match in classify_event().
@@ -25,6 +13,7 @@ use windows::Win32::UI::Accessibility::{
     //   4. Consider debouncing — rapid events can flood the channel.
     //   5. Test with actual window operations to verify correct classification.
     // ═══════════════════════════════════════════════════════════════════════════════
+    HWINEVENTHOOK,
     SetWinEventHook,
     UnhookWinEvent,
 };
@@ -133,7 +122,7 @@ pub extern "system" fn event_hook_callback(
     _dwms_event_time: u32,
 ) {
     // We only care about window-level objects, not child objects
-    if id_object != OBJID_WINDOW.0 as i32 && id_object != 0 {
+    if id_object != OBJID_WINDOW.0 && id_object != 0 {
         return;
     }
     if id_child != 0 {
@@ -144,22 +133,21 @@ pub extern "system" fn event_hook_callback(
     }
 
     // Ignore null HWND events
-    if hwnd.0 == 0 {
+    if hwnd.0.is_null() {
         return;
     }
 
     if let Some(window_event) = classify_event(event, hwnd) {
         trace!(
             "Classified event: {:?} for hwnd=0x{:X}",
-            window_event, hwnd.0
+            window_event, hwnd.0 as usize
         );
 
-        if let Ok(guard) = EVENT_SENDER.lock() {
-            if let Some(tx) = guard.as_ref() {
-                if let Err(e) = tx.send(window_event) {
-                    warn!("Failed to send event to channel: {}", e);
-                }
-            }
+        if let Ok(guard) = EVENT_SENDER.lock()
+            && let Some(tx) = guard.as_ref()
+            && let Err(e) = tx.send(window_event)
+        {
+            warn!("Failed to send event to channel: {}", e);
         }
     }
 }
@@ -188,10 +176,13 @@ pub fn classify_event(event: u32, hwnd: HWND) -> Option<WindowEvent> {
             }
         }
         EVENT_OBJECT_NAMECHANGE => Some(WindowEvent::WindowRenamed(window_id)),
-        EVENT_OBJECT_FOCUS => Some(WindowEvent::WindowFocused(WindowId(hwnd.0))),
+        EVENT_OBJECT_FOCUS => Some(WindowEvent::WindowFocused(WindowId(hwnd.0 as isize))),
         // Handle focus events that may come through as locationchange
         _ => {
-            trace!("Unhandled WinEvent 0x{:X} for hwnd=0x{:X}", event, hwnd.0);
+            trace!(
+                "Unhandled WinEvent 0x{:X} for hwnd=0x{:X}",
+                event, hwnd.0 as usize
+            );
             None
         }
     }
@@ -214,14 +205,14 @@ pub fn start_event_loop(event_tx: Sender<WindowEvent>) -> anyhow::Result<()> {
                 // Create a message-only window
                 let hwnd = match CreateWindowExW(
                     WS_EX_NOACTIVATE,
-                    windows::w!("Message"),
+                    windows::core::w!("Message"),
                     None,
                     WS_OVERLAPPED,
                     0,
                     0,
                     0,
                     0,
-                    HWND_MESSAGE,
+                    Some(HWND_MESSAGE),
                     None,
                     None,
                     None,
@@ -238,8 +229,8 @@ pub fn start_event_loop(event_tx: Sender<WindowEvent>) -> anyhow::Result<()> {
 
                 // Message loop
                 let mut msg = MSG::default();
-                while GetMessageW(&mut msg, Some(HWND(0)), 0, 0).as_bool() {
-                    TranslateMessage(&msg);
+                while GetMessageW(&mut msg, Some(HWND(std::ptr::null_mut())), 0, 0).as_bool() {
+                    let _ = TranslateMessage(&msg);
                     DispatchMessageW(&msg);
 
                     // Handle display change
@@ -286,7 +277,7 @@ impl EventDebouncer {
     ///
     /// Returns `true` if the event should be suppressed, `false` otherwise.
     /// Call this with the current event count and elapsed time since the first event.
-    pub fn should_debounce(&mut self, event_count: usize, elapsed_ms: u64) -> bool {
+    pub fn should_debounce(&mut self, event_count: usize, _elapsed_ms: u64) -> bool {
         match self.first_event_time {
             None => {
                 self.first_event_time = Some(Instant::now());

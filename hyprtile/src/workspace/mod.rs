@@ -5,15 +5,15 @@
 //! active on each monitor, and handles monitor disconnect by
 //! redistributing windows to a fallback monitor.
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// AI_AGENT_STOP: WORKSPACE_MANAGER — Multi-monitor workspace coordinator.
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// AI_AGENT_STOP: WORKSPACE_MANAGER â€” Multi-monitor workspace coordinator.
 // Before modifying cross-workspace behavior:
 //   1. window_to_workspace and window_to_monitor HashMaps track location.
 //   2. switch_workspace() on one monitor does not affect other monitors.
 //   3. move_window_to_workspace() physically moves the window + updates maps.
 //   4. handle_monitor_disconnect() redistributes to fallback monitor.
 //   5. All public HashMap fields must stay in sync with workspace contents.
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 pub mod model;
 
@@ -35,6 +35,12 @@ pub struct WorkspaceManager {
     pub window_to_workspace: HashMap<WindowId, u32>,
     /// Which monitor each window lives on.
     pub window_to_monitor: HashMap<WindowId, u32>,
+}
+
+impl Default for WorkspaceManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl WorkspaceManager {
@@ -125,20 +131,14 @@ impl WorkspaceManager {
             .window_to_monitor
             .get(&window)
             .copied()
-            .ok_or_else(|| {
-                anyhow!(
-                    "Window {} is not assigned to any monitor",
-                    window.as_raw().0
-                )
-            })?;
+            .ok_or_else(|| anyhow!("Window {} is not assigned to any monitor", window.0))?;
 
         // Remove from current workspace.
-        if let Some(current_ws_id) = self.window_to_workspace.remove(&window) {
-            if let Some(mw) = self.monitors.get_mut(&monitor_id) {
-                if let Some(ws) = mw.get_workspace_mut(current_ws_id) {
-                    ws.remove_window(window);
-                }
-            }
+        if let Some(current_ws_id) = self.window_to_workspace.remove(&window)
+            && let Some(mw) = self.monitors.get_mut(&monitor_id)
+            && let Some(ws) = mw.get_workspace_mut(current_ws_id)
+        {
+            ws.remove_window(window);
         }
 
         // Ensure target workspace exists on that monitor.
@@ -156,9 +156,7 @@ impl WorkspaceManager {
 
         debug!(
             "Moved window {} to workspace {} on monitor {}",
-            window.as_raw().0,
-            workspace_id,
-            monitor_id
+            window.0, workspace_id, monitor_id
         );
         Ok(())
     }
@@ -177,9 +175,7 @@ impl WorkspaceManager {
         if let Some((old_monitor, old_workspace)) = self.remove_window_internal(window) {
             debug!(
                 "Removed window {} from monitor {} workspace {} for monitor move",
-                window.as_raw().0,
-                old_monitor,
-                old_workspace
+                window.0, old_monitor, old_workspace
             );
         }
 
@@ -196,9 +192,7 @@ impl WorkspaceManager {
 
         debug!(
             "Moved window {} to monitor {} workspace {}",
-            window.as_raw().0,
-            monitor_id,
-            active_ws_id
+            window.0, monitor_id, active_ws_id
         );
         Ok(())
     }
@@ -220,9 +214,7 @@ impl WorkspaceManager {
 
         debug!(
             "Added window {} to monitor {} workspace {}",
-            window.as_raw().0,
-            monitor_id,
-            active_ws_id
+            window.0, monitor_id, active_ws_id
         );
         Ok(())
     }
@@ -253,7 +245,7 @@ impl WorkspaceManager {
             disconnected_id, fallback_id
         );
 
-        let Some(mut mw) = self.monitors.remove(&disconnected_id) else {
+        let Some(mw) = self.monitors.remove(&disconnected_id) else {
             warn!(
                 "Tried to handle disconnect for unknown monitor {}",
                 disconnected_id
@@ -272,14 +264,13 @@ impl WorkspaceManager {
         drop(mw);
 
         // Ensure fallback monitor exists.
-        if !self.monitors.contains_key(&fallback_id) {
+        self.monitors.entry(fallback_id).or_insert_with(|| {
             warn!(
                 "Fallback monitor {} not found, creating default",
                 fallback_id
             );
-            self.monitors
-                .insert(fallback_id, MonitorWorkspace::new(fallback_id));
-        }
+            MonitorWorkspace::new(fallback_id)
+        });
 
         let fallback_ws_id = self.monitors[&fallback_id].active_workspace;
 
@@ -341,10 +332,10 @@ impl WorkspaceManager {
         let monitor_id = self.window_to_monitor.remove(&window)?;
         let workspace_id = self.window_to_workspace.remove(&window)?;
 
-        if let Some(mw) = self.monitors.get_mut(&monitor_id) {
-            if let Some(ws) = mw.get_workspace_mut(workspace_id) {
-                ws.remove_window(window);
-            }
+        if let Some(mw) = self.monitors.get_mut(&monitor_id)
+            && let Some(ws) = mw.get_workspace_mut(workspace_id)
+        {
+            ws.remove_window(window);
         }
 
         Some((monitor_id, workspace_id))

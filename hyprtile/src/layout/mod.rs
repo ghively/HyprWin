@@ -129,8 +129,10 @@ pub fn calculate_layout(
             dwindle::DwindleLayout::calculate(windows, workspace_rect, inner, outer, gaps.smart)
         }
         LayoutType::MasterStack => {
-            let mut config = master_stack::MasterStackConfig::default();
-            config.master_width_factor = master_width_factor.clamp(0.1, 0.9);
+            let config = master_stack::MasterStackConfig {
+                master_width_factor: master_width_factor.clamp(0.1, 0.9),
+                ..master_stack::MasterStackConfig::default()
+            };
             master_stack::MasterStackLayout::calculate(
                 windows,
                 workspace_rect,

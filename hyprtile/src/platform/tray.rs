@@ -8,7 +8,7 @@
 
 use std::sync::mpsc::Sender;
 use std::thread;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::platform::events::WindowEvent;
 
@@ -74,8 +74,7 @@ impl TrayIcon {
         info!("Creating system tray icon");
 
         // Build the context menu
-        let menu = tray_icon::menu::Menu::new()
-            .map_err(|e| anyhow::anyhow!("Failed to create tray menu: {}", e))?;
+        let menu = tray_icon::menu::Menu::new();
 
         let show_item = tray_icon::menu::MenuItem::new("Show", true, None);
         let reload_item = tray_icon::menu::MenuItem::new("Reload Config", true, None);
@@ -83,9 +82,9 @@ impl TrayIcon {
         let exit_item = tray_icon::menu::MenuItem::new("Exit", true, None);
 
         // Capture menu item IDs before moving items into the menu
-        let show_id = show_item.id().to_string();
-        let reload_id = reload_item.id().to_string();
-        let exit_id = exit_item.id().to_string();
+        let show_id = show_item.id().0.clone();
+        let reload_id = reload_item.id().0.clone();
+        let exit_id = exit_item.id().0.clone();
 
         menu.append(&show_item)
             .map_err(|e| anyhow::anyhow!("Failed to add Show menu item: {}", e))?;
@@ -120,7 +119,7 @@ impl TrayIcon {
                 loop {
                     match menu_channel.recv() {
                         Ok(event) => {
-                            let clicked_id = event.id.to_string();
+                            let clicked_id = event.id.0.clone();
                             let action = if clicked_id == show_id {
                                 Some(TrayAction::Show)
                             } else if clicked_id == reload_id {
@@ -181,7 +180,7 @@ impl TrayIcon {
 ///
 /// Generates a 32x32 RGBA icon with a teal/blue gradient square.
 /// In a production build this would load an embedded ICO file instead.
-fn create_hyprtile_icon() -> anyhow::Result<tray_icon::icon::Icon> {
+fn create_hyprtile_icon() -> anyhow::Result<tray_icon::Icon> {
     const SIZE: usize = 32;
     const PIXELS: usize = SIZE * SIZE;
 
@@ -209,7 +208,7 @@ fn create_hyprtile_icon() -> anyhow::Result<tray_icon::icon::Icon> {
         }
     }
 
-    tray_icon::icon::Icon::from_rgba(rgba, SIZE as u32, SIZE as u32)
+    tray_icon::Icon::from_rgba(rgba, SIZE as u32, SIZE as u32)
         .map_err(|e| anyhow::anyhow!("Failed to create icon from RGBA data: {}", e))
 }
 

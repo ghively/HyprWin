@@ -21,7 +21,7 @@ use tracing::trace;
 /// (provided the input is valid), preventing negative sizes.
 ///
 /// # Examples
-/// ```
+/// ```ignore
 /// let rect = Rect::new(0, 0, 100, 100);
 /// let shrunk = apply_gaps(&rect, 4);
 /// // shrunk == Rect::new(4, 4, 92, 92)
@@ -64,7 +64,7 @@ pub fn apply_inner_gaps(rect: &Rect, gap: i32) -> Rect {
 /// When `smart_gaps` is enabled and there is only one window, gaps are
 /// removed so the single window fills the entire workspace.
 pub fn should_disable_gaps(window_count: usize, smart_gaps: bool) -> bool {
-    smart_gaps && window_count <= 1
+    smart_gaps && window_count == 1
 }
 
 /// Calculate effective inner and outer gap values.

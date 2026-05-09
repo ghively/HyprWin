@@ -21,34 +21,38 @@ use crate::config::types::ModKey;
 ///
 /// This is accessed by the message loop thread to map WM_HOTKEY IDs back to
 /// actionable commands without needing a reference to `HotkeyManager`.
-use std::sync::Mutex;
-static HOTKEY_ACTIONS: Mutex<std::collections::HashMap<u32, String>> =
-    Mutex::new(std::collections::HashMap::new());
+use std::sync::{Mutex, OnceLock};
+
+fn hotkey_actions() -> &'static Mutex<std::collections::HashMap<u32, String>> {
+    static HOTKEY_ACTIONS: OnceLock<Mutex<std::collections::HashMap<u32, String>>> =
+        OnceLock::new();
+    HOTKEY_ACTIONS.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+}
 
 /// Register a hotkey action in the global map.
 pub fn register_hotkey_action(id: u32, action: String) {
-    if let Ok(mut map) = HOTKEY_ACTIONS.lock() {
+    if let Ok(mut map) = hotkey_actions().lock() {
         map.insert(id, action);
     }
 }
 
 /// Unregister a hotkey action from the global map.
 pub fn unregister_hotkey_action(id: u32) {
-    if let Ok(mut map) = HOTKEY_ACTIONS.lock() {
+    if let Ok(mut map) = hotkey_actions().lock() {
         map.remove(&id);
     }
 }
 
 /// Clear all hotkey actions from the global map.
 pub fn clear_hotkey_actions() {
-    if let Ok(mut map) = HOTKEY_ACTIONS.lock() {
+    if let Ok(mut map) = hotkey_actions().lock() {
         map.clear();
     }
 }
 
 /// Look up the action string for a given hotkey ID.
 pub fn get_hotkey_action(id: u32) -> Option<String> {
-    HOTKEY_ACTIONS.lock().ok()?.get(&id).cloned()
+    hotkey_actions().lock().ok()?.get(&id).cloned()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -97,7 +101,7 @@ impl HotkeyManager {
         self.next_id += 1;
 
         unsafe {
-            let result = RegisterHotKey(Some(HWND(0)), id as i32, modifiers, vk);
+            let result = RegisterHotKey(Some(HWND(std::ptr::null_mut())), id as i32, modifiers, vk);
             if result.is_ok() {
                 debug!(
                     "Registered hotkey id={} key={:?} mods={:?} action={}",
@@ -115,7 +119,7 @@ impl HotkeyManager {
     /// Unregister a hotkey by its ID.
     pub fn unregister(&mut self, id: u32) -> anyhow::Result<()> {
         unsafe {
-            let result = UnregisterHotKey(Some(HWND(0)), id as i32);
+            let result = UnregisterHotKey(Some(HWND(std::ptr::null_mut())), id as i32);
             if result.is_ok() {
                 self.hotkeys.remove(&id);
                 trace!("Unregistered hotkey id={}", id);
@@ -132,7 +136,7 @@ impl HotkeyManager {
         let ids: Vec<u32> = self.hotkeys.keys().copied().collect();
         for id in ids {
             unsafe {
-                let _ = UnregisterHotKey(Some(HWND(0)), id as i32);
+                let _ = UnregisterHotKey(Some(HWND(std::ptr::null_mut())), id as i32);
             }
         }
         self.hotkeys.clear();
@@ -146,10 +150,10 @@ impl HotkeyManager {
     pub fn handle_message(&self, wparam: WPARAM, _lparam: LPARAM) -> Option<&Hotkey> {
         let id = wparam.0 as u32;
         let hk = self.hotkeys.get(&id);
-        if hk.is_some() {
-            if let Some(action) = hk.as_ref().map(|h| h.action.as_str()) {
-                trace!("Hotkey triggered: id={} action={}", id, action);
-            }
+        if hk.is_some()
+            && let Some(action) = hk.as_ref().map(|h| h.action.as_str())
+        {
+            trace!("Hotkey triggered: id={} action={}", id, action);
         }
         hk
     }
@@ -439,14 +443,14 @@ pub fn run_message_loop(hotkey_tx: Sender<String>) -> anyhow::Result<()> {
         // Create a message-only window to receive WM_HOTKEY
         let hwnd = CreateWindowExW(
             WS_EX_NOACTIVATE,
-            windows::w!("Message"),
+            windows::core::w!("Message"),
             None,
             WS_OVERLAPPED,
             0,
             0,
             0,
             0,
-            HWND_MESSAGE,
+            Some(HWND_MESSAGE),
             None,
             None,
             None,
@@ -456,7 +460,7 @@ pub fn run_message_loop(hotkey_tx: Sender<String>) -> anyhow::Result<()> {
 
         let mut msg = MSG::default();
         loop {
-            let result = GetMessageW(&mut msg, Some(HWND(0)), 0, 0);
+            let result = GetMessageW(&mut msg, Some(HWND(std::ptr::null_mut())), 0, 0);
             if result.0 == 0 {
                 // WM_QUIT received
                 break;
@@ -480,7 +484,7 @@ pub fn run_message_loop(hotkey_tx: Sender<String>) -> anyhow::Result<()> {
                 }
             }
 
-            TranslateMessage(&msg);
+            let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
 

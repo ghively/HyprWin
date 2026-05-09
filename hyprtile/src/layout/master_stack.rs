@@ -94,10 +94,14 @@ impl MasterStackLayout {
         match config.orientation {
             Orientation::Horizontal => {
                 // Split workspace into master (left) and stack (right).
-                let master_width = ((rect.width as f64 * config.master_width_factor).round()
-                    as i32)
-                    .max(1)
-                    .min(rect.width.saturating_sub(1));
+                // When there's no stack, master fills the entire workspace.
+                let master_width = if stack_count == 0 {
+                    rect.width
+                } else {
+                    ((rect.width as f64 * config.master_width_factor).round() as i32)
+                        .max(1)
+                        .min(rect.width.saturating_sub(1))
+                };
                 let stack_x = rect.x + master_width;
                 let stack_width = rect.width - master_width;
 
@@ -111,7 +115,7 @@ impl MasterStackLayout {
                 // Master windows: split vertically (top to bottom).
                 if master_count > 0 {
                     let master_slot_height = master_region.height / master_count as i32;
-                    for i in 0..master_count {
+                    for (i, &win) in windows.iter().enumerate().take(master_count) {
                         let my = master_region.y + master_slot_height * i as i32;
                         let mh = if i == master_count - 1 {
                             // Last window gets remaining height
@@ -120,7 +124,7 @@ impl MasterStackLayout {
                             master_slot_height
                         };
                         let win_rect = Rect::new(master_region.x, my, master_region.width, mh);
-                        results.push((windows[i], apply_gaps(&win_rect, gap)));
+                        results.push((win, apply_gaps(&win_rect, gap)));
                     }
                 }
 
@@ -142,10 +146,14 @@ impl MasterStackLayout {
             }
             Orientation::Vertical => {
                 // Split workspace into master (top) and stack (bottom).
-                let master_height = ((rect.height as f64 * config.master_width_factor).round()
-                    as i32)
-                    .max(1)
-                    .min(rect.height.saturating_sub(1));
+                // When there's no stack, master fills the entire workspace.
+                let master_height = if stack_count == 0 {
+                    rect.height
+                } else {
+                    ((rect.height as f64 * config.master_width_factor).round() as i32)
+                        .max(1)
+                        .min(rect.height.saturating_sub(1))
+                };
                 let stack_y = rect.y + master_height;
                 let stack_height = rect.height - master_height;
 
@@ -159,7 +167,7 @@ impl MasterStackLayout {
                 // Master windows: split horizontally (left to right).
                 if master_count > 0 {
                     let master_slot_width = master_region.width / master_count as i32;
-                    for i in 0..master_count {
+                    for (i, &win) in windows.iter().enumerate().take(master_count) {
                         let mx = master_region.x + master_slot_width * i as i32;
                         let mw = if i == master_count - 1 {
                             master_region.x + master_region.width - mx
@@ -167,7 +175,7 @@ impl MasterStackLayout {
                             master_slot_width
                         };
                         let win_rect = Rect::new(mx, master_region.y, mw, master_region.height);
-                        results.push((windows[i], apply_gaps(&win_rect, gap)));
+                        results.push((win, apply_gaps(&win_rect, gap)));
                     }
                 }
 

@@ -45,7 +45,7 @@ pub fn get_monitor_dpi(hmonitor: isize) -> u32 {
     let mut dpi_y: u32 = 0;
     let result = unsafe {
         GetDpiForMonitor(
-            windows::Win32::Graphics::Gdi::HMONITOR(hmonitor),
+            windows::Win32::Graphics::Gdi::HMONITOR(hmonitor as *mut _),
             MONITOR_DPI_TYPE(0), // MDT_EFFECTIVE_DPI
             &mut dpi_x,
             &mut dpi_y,

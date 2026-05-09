@@ -13,7 +13,7 @@ pub mod protocol;
 
 use protocol::*;
 
-use bytes::BytesMut;
+use bytes::{Buf, BytesMut};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::windows::named_pipe::{NamedPipeServer, PipeMode, ServerOptions};
 use tokio_util::codec::{Decoder, Encoder};
@@ -85,7 +85,7 @@ impl Encoder<IpcResponse> for JsonCodec {
 /// with a 4-byte big-endian length, followed by the UTF-8 JSON payload.
 ///
 /// # Example
-/// ```no_run
+/// ```ignore
 /// let server = IpcServer::new();
 /// server.start().await?;
 /// ```
@@ -94,6 +94,12 @@ pub struct IpcServer {
 }
 
 use std::sync::Arc;
+
+impl Default for IpcServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl IpcServer {
     /// Create a new IPC server instance.
@@ -234,30 +240,24 @@ impl IpcServer {
             }
 
             // Attempt to decode as many complete requests as available
-            loop {
-                match codec.decode(&mut buf)? {
-                    Some(request) => {
-                        debug!("Received IPC request: {:?}", request);
+            while let Some(request) = codec.decode(&mut buf)? {
+                debug!("Received IPC request: {:?}", request);
 
-                        // The AppState-integrated dispatch is performed by the app
-                        // coordinator which owns the state.  In standalone mode we
-                        // return an informative error.
-                        let response = IpcResponse::error(
-                            "IPC server not yet integrated with AppState".to_string(),
-                        );
+                // The AppState-integrated dispatch is performed by the app
+                // coordinator which owns the state.  In standalone mode we
+                // return an informative error.
+                let response =
+                    IpcResponse::error("IPC server not yet integrated with AppState".to_string());
 
-                        let mut out_buf = BytesMut::new();
-                        codec.encode(response, &mut out_buf)?;
-                        if let Err(e) = client.write_all(&out_buf).await {
-                            warn!("IPC write error: {}", e);
-                            return Ok(());
-                        }
-                        if let Err(e) = client.flush().await {
-                            warn!("IPC flush error: {}", e);
-                            return Ok(());
-                        }
-                    }
-                    None => break, // need more data
+                let mut out_buf = BytesMut::new();
+                codec.encode(response, &mut out_buf)?;
+                if let Err(e) = client.write_all(&out_buf).await {
+                    warn!("IPC write error: {}", e);
+                    return Ok(());
+                }
+                if let Err(e) = client.flush().await {
+                    warn!("IPC flush error: {}", e);
+                    return Ok(());
                 }
             }
         }
@@ -431,13 +431,7 @@ mod tests {
     #[test]
     fn test_parse_request_workspaces() {
         let json = r#"{"command":"workspaces","monitor":1}"#;
-        let req = match parse_request(json.as_bytes()) {
-            Ok(r) => r,
-            Err(e) => {
-                error!("Failed to parse request: {}", e);
-                continue;
-            }
-        };
+        let req = parse_request(json.as_bytes()).expect("request should parse");
         match req {
             IpcRequest::Workspaces { monitor: Some(1) } => {}
             other => panic!("Expected Workspaces request, got: {:?}", other),
@@ -447,13 +441,7 @@ mod tests {
     #[test]
     fn test_parse_request_exit() {
         let json = r#"{"command":"exit"}"#;
-        let req = match parse_request(json.as_bytes()) {
-            Ok(r) => r,
-            Err(e) => {
-                error!("Failed to parse request: {}", e);
-                continue;
-            }
-        };
+        let req = parse_request(json.as_bytes()).expect("request should parse");
         match req {
             IpcRequest::Exit => {}
             other => panic!("Expected Exit request, got: {:?}", other),
@@ -464,13 +452,7 @@ mod tests {
     fn test_serialize_response_success() {
         let resp = IpcResponse::success(Some(serde_json::json!({"count": 42 })));
         let bytes = serialize_response(&resp);
-        let json_str = match String::from_utf8(bytes) {
-            Ok(s) => s,
-            Err(e) => {
-                error!("Invalid UTF-8 in request: {}", e);
-                continue;
-            }
-        };
+        let json_str = String::from_utf8(bytes).expect("response should be valid UTF-8");
         assert!(json_str.contains("\"success\":true"));
         assert!(json_str.contains("42"));
     }
@@ -479,13 +461,7 @@ mod tests {
     fn test_serialize_response_error() {
         let resp = IpcResponse::error("something went wrong");
         let bytes = serialize_response(&resp);
-        let json_str = match String::from_utf8(bytes) {
-            Ok(s) => s,
-            Err(e) => {
-                error!("Invalid UTF-8 in request: {}", e);
-                continue;
-            }
-        };
+        let json_str = String::from_utf8(bytes).expect("response should be valid UTF-8");
         assert!(json_str.contains("\"success\":false"));
         assert!(json_str.contains("something went wrong"));
     }

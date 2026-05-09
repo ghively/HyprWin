@@ -108,14 +108,16 @@ impl Window {
             is_tool,
         };
 
-        // If the window is currently invisible or iconic, start in Minimized.
-        if !id.is_visible() || id.is_iconic() {
-            win.state = WindowState::Minimized;
-        }
-
-        // If the window is already maximized, reflect that.
-        if id.is_zoomed() {
-            win.state = WindowState::Maximized;
+        // Only query actual window state if the handle is a real window.
+        if id.is_valid() {
+            // If the window is currently invisible or iconic, start in Minimized.
+            if !id.is_visible() || id.is_iconic() {
+                win.state = WindowState::Minimized;
+            }
+            // If the window is already maximized, reflect that.
+            if id.is_zoomed() {
+                win.state = WindowState::Maximized;
+            }
         }
 
         win
@@ -248,12 +250,10 @@ impl Window {
                 } else {
                     return false;
                 }
+            } else if self.title == *pattern {
+                matched = true;
             } else {
-                if self.title == *pattern {
-                    matched = true;
-                } else {
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -264,12 +264,10 @@ impl Window {
                 } else {
                     return false;
                 }
+            } else if self.process_name == *pattern {
+                matched = true;
             } else {
-                if self.process_name == *pattern {
-                    matched = true;
-                } else {
-                    return false;
-                }
+                return false;
             }
         }
 

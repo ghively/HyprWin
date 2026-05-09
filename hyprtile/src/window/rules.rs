@@ -9,15 +9,15 @@ use crate::window::model::Window;
 use regex::Regex;
 use tracing::{debug, warn};
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// AI_AGENT_STOP: RULE_ENGINE — Regex-based window classification.
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// AI_AGENT_STOP: RULE_ENGINE â€” Regex-based window classification.
 // Before adding new rule types:
 //   1. WindowRule fields: match_class, match_title, match_process (all regex).
-//   2. Rules are evaluated in order — first match wins.
+//   2. Rules are evaluated in order â€” first match wins.
 //   3. Action can be: Float, Tile, or assign workspace/monitor/size/position.
 //   4. Position string values: "center", "bottom_right", "top_left", etc.
 //   5. Regex compilation happens once at RuleEngine construction.
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 /// Owns the list of [`WindowRule`]s and exposes query helpers.
 ///
@@ -46,10 +46,7 @@ impl RuleEngine {
         for rule in matching {
             debug!(
                 "Applying rule to window {} (class='{}', title='{}'): {:?}",
-                window.id.as_raw().0,
-                window.class_name,
-                window.title,
-                rule
+                window.id.0, window.class_name, window.title, rule
             );
 
             if let Some(ref action) = rule.action {

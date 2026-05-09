@@ -14,7 +14,9 @@ use windows::Win32::Graphics::Gdi::{
     // ═══════════════════════════════════════════════════════════════════════════════
     EnumDisplayMonitors,
     GetMonitorInfoW,
+    HDC,
     HMONITOR,
+    MONITOR_DEFAULTTONEAREST,
     MONITORINFO,
     MONITORINFOEXW,
     MonitorFromWindow,
@@ -23,7 +25,6 @@ use windows::Win32::UI::HiDpi::{
     DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, GetDpiForMonitor, MDT_EFFECTIVE_DPI,
     SetThreadDpiAwarenessContext,
 };
-use windows::Win32::UI::WindowsAndMessaging::MONITOR_DEFAULTTONEAREST;
 
 use crate::util::rect::Rect;
 
@@ -51,8 +52,6 @@ static MONITOR_COUNTER: AtomicU32 = AtomicU32::new(1);
 impl Monitor {
     /// Create a Monitor from an HMONITOR handle.
     pub fn from_hmonitor(hmonitor: isize) -> Option<Self> {
-        let hwnd = windows::Win32::Foundation::HWND(hmonitor);
-
         let mut info = MONITORINFOEXW {
             monitorInfo: MONITORINFO {
                 cbSize: mem::size_of::<MONITORINFOEXW>() as u32,
@@ -74,8 +73,10 @@ impl Monitor {
         };
 
         unsafe {
-            let result =
-                GetMonitorInfoW(HMONITOR(hmonitor), &mut info as *mut _ as *mut MONITORINFO);
+            let result = GetMonitorInfoW(
+                HMONITOR(hmonitor as *mut _),
+                &mut info as *mut _ as *mut MONITORINFO,
+            );
             if !result.as_bool() {
                 return None;
             }
@@ -89,17 +90,16 @@ impl Monitor {
         );
 
         let mut dpi_x: u32 = 96;
-        let mut dpi_y: u32 = 96;
+        let mut _dpi_y: u32 = 96;
         unsafe {
             let result = GetDpiForMonitor(
-                HMONITOR(hmonitor),
+                HMONITOR(hmonitor as *mut _),
                 MDT_EFFECTIVE_DPI,
                 &mut dpi_x,
-                &mut dpi_y,
+                &mut _dpi_y,
             );
             if result.is_err() {
                 dpi_x = 96;
-                dpi_y = 96;
             }
         }
 
@@ -116,13 +116,13 @@ impl Monitor {
 
     /// Check if this monitor contains the given window.
     pub fn contains_window(&self, hwnd: isize) -> bool {
-        let hwnd = windows::Win32::Foundation::HWND(hwnd);
+        let hwnd = windows::Win32::Foundation::HWND(hwnd as *mut _);
         unsafe {
             let hmonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
             if hmonitor.is_invalid() {
                 return false;
             }
-            hmonitor.0 == self.handle
+            hmonitor.0 as isize == self.handle
         }
     }
 
@@ -151,13 +151,13 @@ pub fn enumerate_monitors() -> Vec<Monitor> {
 
 extern "system" fn enum_monitors_callback(
     _hmonitor: HMONITOR,
-    _hdc: *mut std::ffi::c_void,
+    _hdc: HDC,
     _clip_rect: *mut RECT,
     lparam: LPARAM,
 ) -> BOOL {
     let monitors = unsafe { &mut *(lparam.0 as *mut Vec<Monitor>) };
 
-    if let Some(monitor) = Monitor::from_hmonitor(_hmonitor.0) {
+    if let Some(monitor) = Monitor::from_hmonitor(_hmonitor.0 as isize) {
         monitors.push(monitor);
     }
 
@@ -166,13 +166,13 @@ extern "system" fn enum_monitors_callback(
 
 /// Get the monitor that contains the specified window.
 pub fn get_monitor_for_window(hwnd: isize) -> Option<Monitor> {
-    let hwnd = windows::Win32::Foundation::HWND(hwnd);
+    let hwnd = windows::Win32::Foundation::HWND(hwnd as *mut _);
     unsafe {
         let hmonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
         if hmonitor.is_invalid() {
             return None;
         }
-        Monitor::from_hmonitor(hmonitor.0)
+        Monitor::from_hmonitor(hmonitor.0 as isize)
     }
 }
 
@@ -203,11 +203,10 @@ pub fn set_dpi_awareness() {
 /// Register for display change notifications.
 pub fn register_display_change_notification() -> anyhow::Result<()> {
     use std::ptr::null_mut;
-    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Devices::Display::GUID_DEVINTERFACE_MONITOR;
     use windows::Win32::UI::WindowsAndMessaging::{
-        CreateWindowExW, DBT_DEVTYP_DEVICEINTERFACE, DEVICE_NOTIFY_WINDOW_HANDLE,
-        GUID_DEVINTERFACE_MONITOR, HWND_MESSAGE, RegisterDeviceNotificationW,
-        RegisterWindowMessageW, WM_DEVICECHANGE,
+        CreateWindowExW, DBT_DEVTYP_DEVICEINTERFACE, DEVICE_NOTIFY_WINDOW_HANDLE, HWND_MESSAGE,
+        RegisterDeviceNotificationW,
     };
 
     info!("Registering for display change notifications");
@@ -216,14 +215,14 @@ pub fn register_display_change_notification() -> anyhow::Result<()> {
         // Create a message-only window to receive notifications
         let hwnd = CreateWindowExW(
             windows::Win32::UI::WindowsAndMessaging::WS_EX_NOACTIVATE,
-            windows::w!("Message"),
+            windows::core::w!("Message"),
             None,
             windows::Win32::UI::WindowsAndMessaging::WS_OVERLAPPED,
             0,
             0,
             0,
             0,
-            HWND_MESSAGE,
+            Some(HWND_MESSAGE),
             None,
             None,
             Some(null_mut()),
@@ -240,14 +239,14 @@ pub fn register_display_change_notification() -> anyhow::Result<()> {
         // Register for device notifications
         let notification_filter = DEV_BROADCAST_DEVICEINTERFACE_W {
             dbcc_size: mem::size_of::<DEV_BROADCAST_DEVICEINTERFACE_W>() as u32,
-            dbcc_devicetype: DBT_DEVTYP_DEVICEINTERFACE,
+            dbcc_devicetype: DBT_DEVTYP_DEVICEINTERFACE.0,
             dbcc_reserved: 0,
             dbcc_classguid: GUID_DEVINTERFACE_MONITOR,
             dbcc_name: [0u16; 1],
         };
 
         let h_notify = RegisterDeviceNotificationW(
-            hwnd,
+            hwnd.into(),
             &notification_filter as *const _ as *const _,
             DEVICE_NOTIFY_WINDOW_HANDLE,
         );

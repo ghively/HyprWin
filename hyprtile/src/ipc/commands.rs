@@ -3,17 +3,17 @@ use crate::app::AppState;
 use crate::layout::LayoutType;
 use crate::workspace::model::FocusDirection;
 use serde_json::json;
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// AI_AGENT_STOP: IPC_COMMAND_DISPATCH — All IPC commands handled here.
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// AI_AGENT_STOP: IPC_COMMAND_DISPATCH â€” All IPC commands handled here.
 // Before adding new command handlers:
 //   1. Each handler receives (&mut AppState) and returns IpcResponse.
 //   2. Use IpcResponse::success(Some(json)) for data responses.
-//   3. Use IpcResponse::error("msg") for failures — always include context.
-//   4. Mirror app.rs behavior — IPC is just another UI for the same actions.
-//   5. Keep handlers thin — delegate to AppState methods, don't duplicate logic.
-// ═══════════════════════════════════════════════════════════════════════════════
+//   3. Use IpcResponse::error("msg") for failures â€” always include context.
+//   4. Mirror app.rs behavior â€” IPC is just another UI for the same actions.
+//   5. Keep handlers thin â€” delegate to AppState methods, don't duplicate logic.
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 /// Handle an incoming IPC request and produce a response.
 ///
@@ -375,7 +375,7 @@ fn handle_cycle_layout(state: &mut AppState) -> IpcResponse {
             "Cycled layout on monitor {} workspace {} to {}",
             monitor_id, ws.id, layout_name
         );
-        drop(ws);
+        let _ = ws;
         state.apply_layout(monitor_id);
         return IpcResponse::success(Some(json!({ "layout": layout_name })));
     }
@@ -392,11 +392,11 @@ fn handle_switch_workspace(id: u32, state: &mut AppState) -> IpcResponse {
     }
 
     // Show windows on the new workspace, hide on the old
-    if let Some(monitor_ws) = state.workspace_manager.monitors.get(&monitor_id) {
-        if let Some(ws) = monitor_ws.get_workspace(id) {
-            for &win_id in &ws.windows {
-                crate::platform::window::show_window(win_id.as_raw(), true);
-            }
+    if let Some(monitor_ws) = state.workspace_manager.monitors.get(&monitor_id)
+        && let Some(ws) = monitor_ws.get_workspace(id)
+    {
+        for &win_id in &ws.windows {
+            crate::platform::window::show_window(win_id.as_raw(), true);
         }
     }
 

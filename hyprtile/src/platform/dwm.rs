@@ -1,7 +1,8 @@
 use std::mem;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{trace, warn};
 use windows::Win32::Foundation::{BOOL, HWND, TRUE};
 use windows::Win32::Graphics::Dwm::*;
+use windows::Win32::UI::Controls::MARGINS;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AI_AGENT_STOP: DWM_INTEGRATION — Windows version-sensitive APIs.
@@ -36,7 +37,7 @@ impl Default for BorderColors {
 /// Uses `DWMWA_BORDER_COLOR` which is supported on Windows 11 build 22000+.
 /// Falls back gracefully on older systems.
 pub fn set_border_color(hwnd: isize, color: u32) -> anyhow::Result<()> {
-    let hwnd = HWND(hwnd);
+    let hwnd = HWND(hwnd as *mut _);
     if hwnd.is_invalid() {
         anyhow::bail!("Invalid HWND for set_border_color");
     }
@@ -53,7 +54,10 @@ pub fn set_border_color(hwnd: isize, color: u32) -> anyhow::Result<()> {
             mem::size_of::<u32>() as u32,
         );
         if result.is_ok() {
-            trace!("Set border color 0x{:08X} for hwnd=0x{:X}", color, hwnd.0);
+            trace!(
+                "Set border color 0x{:08X} for hwnd=0x{:X}",
+                color, hwnd.0 as usize
+            );
             Ok(())
         } else {
             anyhow::bail!("DwmSetWindowAttribute(DWMWA_BORDER_COLOR) failed");
@@ -66,7 +70,7 @@ pub fn set_border_color(hwnd: isize, color: u32) -> anyhow::Result<()> {
 /// Setting this to `false` makes window moves/resizes snappier by
 /// disabling the built-in DWM animation.
 pub fn set_transitions_enabled(hwnd: isize, enabled: bool) -> anyhow::Result<()> {
-    let hwnd = HWND(hwnd);
+    let hwnd = HWND(hwnd as *mut _);
     if hwnd.is_invalid() {
         anyhow::bail!("Invalid HWND for set_transitions_enabled");
     }
@@ -84,7 +88,7 @@ pub fn set_transitions_enabled(hwnd: isize, enabled: bool) -> anyhow::Result<()>
             trace!(
                 "Set transitions {} for hwnd=0x{:X}",
                 if enabled { "enabled" } else { "disabled" },
-                hwnd.0
+                hwnd.0 as usize
             );
             Ok(())
         } else {
@@ -105,7 +109,7 @@ pub fn force_disable_transitions(hwnd: isize) -> anyhow::Result<()> {
 /// - `rounded = true` — use `DWMWCP_ROUND`
 /// - `rounded = false` — use `DWMWCP_DONOTROUND`
 pub fn set_corner_preference(hwnd: isize, rounded: bool) -> anyhow::Result<()> {
-    let hwnd = HWND(hwnd);
+    let hwnd = HWND(hwnd as *mut _);
     if hwnd.is_invalid() {
         anyhow::bail!("Invalid HWND for set_corner_preference");
     }
@@ -126,7 +130,7 @@ pub fn set_corner_preference(hwnd: isize, rounded: bool) -> anyhow::Result<()> {
         if result.is_ok() {
             trace!(
                 "Set corner preference {:?} for hwnd=0x{:X}",
-                preference, hwnd.0
+                preference, hwnd.0 as usize
             );
             Ok(())
         } else {
@@ -141,8 +145,8 @@ pub fn set_corner_preference(hwnd: isize, rounded: bool) -> anyhow::Result<()> {
 /// hint. On older systems this falls back to `extend_frame_into_client`
 /// to simulate a border.
 pub fn set_border_width(hwnd: isize, width: i32) -> anyhow::Result<()> {
-    let hwnd = HWND(hwnd);
-    if hwnd.is_invalid() {
+    let hwnd_raw = HWND(hwnd as *mut _);
+    if hwnd_raw.is_invalid() {
         anyhow::bail!("Invalid HWND for set_border_width");
     }
 
@@ -154,9 +158,9 @@ pub fn set_border_width(hwnd: isize, width: i32) -> anyhow::Result<()> {
         cyBottomHeight: width,
     };
 
-    extend_frame_into_client(hwnd, &margins)?;
+    extend_frame_into_client(hwnd_raw, &margins)?;
 
-    trace!("Set border width {} for hwnd=0x{:X}", width, hwnd.0);
+    trace!("Set border width {} for hwnd=0x{:X}", width, hwnd as usize);
     Ok(())
 }
 
@@ -165,7 +169,7 @@ pub fn set_border_width(hwnd: isize, width: i32) -> anyhow::Result<()> {
 /// This ensures the DWM compositor treats the window as a
 /// "glass" client so that border effects are visible.
 pub fn enable_dwm_rendering(hwnd: isize) -> anyhow::Result<()> {
-    let hwnd = HWND(hwnd);
+    let hwnd = HWND(hwnd as *mut _);
     if hwnd.is_invalid() {
         anyhow::bail!("Invalid HWND for enable_dwm_rendering");
     }
@@ -199,7 +203,7 @@ pub fn enable_dwm_rendering(hwnd: isize) -> anyhow::Result<()> {
             warn!("DwmSetWindowAttribute(DWMWA_ALLOW_NCPAINT) failed");
         }
 
-        trace!("Enabled DWM rendering for hwnd=0x{:X}", hwnd.0);
+        trace!("Enabled DWM rendering for hwnd=0x{:X}", hwnd.0 as usize);
         Ok(())
     }
 }
@@ -208,8 +212,7 @@ pub fn enable_dwm_rendering(hwnd: isize) -> anyhow::Result<()> {
 ///
 /// Positive margin values cause the border area to be rendered outside
 /// the client area, producing visible colored borders.
-pub fn extend_frame_into_client(hwnd: isize, margins: &MARGINS) -> anyhow::Result<()> {
-    let hwnd = HWND(hwnd);
+pub fn extend_frame_into_client(hwnd: HWND, margins: &MARGINS) -> anyhow::Result<()> {
     if hwnd.is_invalid() {
         anyhow::bail!("Invalid HWND for extend_frame_into_client");
     }
@@ -223,7 +226,7 @@ pub fn extend_frame_into_client(hwnd: isize, margins: &MARGINS) -> anyhow::Resul
         if result.is_ok() {
             trace!(
                 "Extended frame into client for hwnd=0x{:X} with margins L:{} R:{} T:{} B:{}",
-                hwnd.0,
+                hwnd.0 as usize,
                 margins.cxLeftWidth,
                 margins.cxRightWidth,
                 margins.cyTopHeight,
@@ -252,7 +255,7 @@ pub fn is_border_color_supported() -> bool {
 
         // RtlGetVersion is the reliable way to get the true OS version
         let ntdll =
-            windows::Win32::System::LibraryLoader::GetModuleHandleW(windows::w!("ntdll.dll"));
+            windows::Win32::System::LibraryLoader::GetModuleHandleW(windows::core::w!("ntdll.dll"));
         let ntdll = match ntdll {
             Ok(h) => h,
             Err(_) => return false,
@@ -263,7 +266,7 @@ pub fn is_border_color_supported() -> bool {
         ) -> i32;
         let proc = windows::Win32::System::LibraryLoader::GetProcAddress(
             ntdll,
-            windows::s!("RtlGetVersion"),
+            windows::core::s!("RtlGetVersion"),
         );
 
         if proc.is_none() {
@@ -296,8 +299,9 @@ pub fn is_border_color_supported() -> bool {
 /// Check whether DWM desktop composition is enabled.
 pub fn is_composition_enabled() -> bool {
     unsafe {
-        let mut enabled: i32 = 0;
-        let result = DwmIsCompositionEnabled(&mut enabled);
-        if result.is_ok() { enabled != 0 } else { false }
+        match DwmIsCompositionEnabled() {
+            Ok(b) => b.as_bool(),
+            Err(_) => false,
+        }
     }
 }

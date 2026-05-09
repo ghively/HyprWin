@@ -10,27 +10,24 @@ use crate::layout::gaps::effective_gaps;
 use crate::layout::{LayoutType, calculate_layout};
 use crate::platform::dwm::{BorderColors, set_border_color};
 use crate::platform::events::{EventHook, WindowEvent};
-use crate::platform::input::{HotkeyManager, register_all_hotkeys};
+use crate::platform::input::HotkeyManager;
 use crate::platform::monitor::{Monitor, enumerate_monitors, set_dpi_awareness};
 use crate::platform::window::{
     DeferredPositioner,
-    SET_WINDOW_POS_FLAGS,
     WindowId,
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // AI_AGENT_STOP: APP_COORDINATOR — This is the central event dispatch loop.
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    // AI_AGENT_STOP: APP_COORDINATOR â€” This is the central event dispatch loop.
     // Before modifying event handling:
-    //   1. All events flow through process_event() — add new cases there.
-    //   2. handle_hotkey() dispatches all user actions — add new action strings.
-    //   3. apply_layout() is called after every state change — keep it fast.
-    //   4. Thread spawning/joining must stay balanced — never orphan threads.
-    // ═══════════════════════════════════════════════════════════════════════════════
+    //   1. All events flow through process_event() â€” add new cases there.
+    //   2. handle_hotkey() dispatches all user actions â€” add new action strings.
+    //   3. apply_layout() is called after every state change â€” keep it fast.
+    //   4. Thread spawning/joining must stay balanced â€” never orphan threads.
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     close_window,
     enumerate_windows,
     focus_window,
-    set_window_pos,
 };
 use crate::platform::window::{should_manage_window, show_window};
-use crate::util::animation::interpolate_rect;
 use crate::util::dpi::{BASE_DPI, scale_rect_to_physical};
 use crate::util::rect::Rect;
 use crate::window::{WindowManager, filter, model::WindowState};
@@ -45,8 +42,7 @@ use tracing::{debug, error, info, warn};
 use windows::Win32::Foundation::{LPARAM, WPARAM};
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::WindowsAndMessaging::{
-    HWND_TOP, PostThreadMessageW, SWP_FRAMECHANGED, SWP_NOACTIVATE,
-    SWP_NOCOPYBITS, SWP_SHOWWINDOW, WM_QUIT,
+    PostThreadMessageW, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOCOPYBITS, SWP_SHOWWINDOW, WM_QUIT,
 };
 
 // ---------------------------------------------------------------------------
@@ -313,6 +309,7 @@ impl AppState {
 ///
 /// Owns the [`AppState`] and the cross-thread event channel.  Sets up the
 /// Win32 hook, hotkey message loop, and drives the main event loop.
+#[allow(dead_code)]
 pub struct App {
     state: AppState,
     event_tx: Sender<WindowEvent>,
@@ -320,7 +317,7 @@ pub struct App {
     config_manager: ConfigManager,
     /// Optional config path override from CLI.
     config_path: Option<std::path::PathBuf>,
-    /// System tray icon (optional — creation may fail on headless systems).
+    /// System tray icon (optional â€” creation may fail on headless systems).
     tray: Option<crate::platform::tray::TrayIcon>,
     /// Registered hotkey manager (kept alive for the lifetime of the app).
     hotkey_manager: Option<HotkeyManager>,
@@ -461,7 +458,8 @@ impl App {
             .spawn(move || {
                 // Store this thread's Win32 ID so the main thread can post WM_QUIT
                 unsafe {
-                    hook_thread_id_inner.store(GetCurrentThreadId(), std::sync::atomic::Ordering::SeqCst);
+                    hook_thread_id_inner
+                        .store(GetCurrentThreadId(), std::sync::atomic::Ordering::SeqCst);
                 }
                 match EventHook::register(event_tx_for_hook) {
                     Ok(hook) => {
@@ -472,14 +470,14 @@ impl App {
                             unsafe {
                                 let mut msg = std::mem::zeroed();
                                 if windows::Win32::UI::WindowsAndMessaging::GetMessageW(
-                                    &mut msg,
-                                    windows::Win32::Foundation::HWND(std::ptr::null_mut()),
-                                    0,
-                                    0,
+                                    &mut msg, None, 0, 0,
                                 )
                                 .0 > 0
                                 {
-                                    windows::Win32::UI::WindowsAndMessaging::TranslateMessage(&msg);
+                                    let _ =
+                                        windows::Win32::UI::WindowsAndMessaging::TranslateMessage(
+                                            &msg,
+                                        );
                                     windows::Win32::UI::WindowsAndMessaging::DispatchMessageW(&msg);
                                 } else {
                                     break;
@@ -552,13 +550,14 @@ impl App {
         // 3. Start TCP IPC server for status bar integration
         let tcp_port = crate::DEFAULT_TCP_PORT;
         let tcp_shutdown = self.state.tcp_shutdown.clone();
+        let tcp_shutdown_for_server = tcp_shutdown.clone();
         let _tcp_handle = tokio::spawn(async move {
             tokio::select! {
                 biased;
                 _ = tcp_shutdown.notified() => {
                     info!("TCP IPC server shutting down");
                 }
-                result = crate::ipc::start_tcp_server(tcp_port) => {
+                result = crate::ipc::start_tcp_server(tcp_port, tcp_shutdown_for_server) => {
                     if let Err(e) = result {
                         warn!("TCP IPC server error: {}", e);
                     }
@@ -599,7 +598,7 @@ impl App {
         }
 
         // Join worker threads with a timeout to avoid hanging forever
-        let join_timeout = Duration::from_secs(2);
+        let _join_timeout = Duration::from_secs(2);
         let hook_join = hook_handle.join();
         if hook_join.is_err() {
             error!("Event hook thread panicked or failed to join");
@@ -731,10 +730,10 @@ impl App {
                 .map(|(&mon_id, _)| mon_id)
                 .collect();
             for mon_id in monitor_ids {
-                if let Some(mw) = self.state.workspace_manager.monitors.get_mut(&mon_id) {
-                    if let Some(ws) = mw.get_workspace_mut(workspace_id) {
-                        let _ = ws.focus_window(hwnd);
-                    }
+                if let Some(mw) = self.state.workspace_manager.monitors.get_mut(&mon_id)
+                    && let Some(ws) = mw.get_workspace_mut(workspace_id)
+                {
+                    let _ = ws.focus_window(hwnd);
                 }
                 // Re-apply border colors on this monitor
                 self.state.apply_layout(mon_id);
@@ -773,18 +772,16 @@ impl App {
     fn handle_window_moved(&mut self, hwnd: WindowId) {
         debug!("Window moved: {:?}", hwnd);
 
-        if let Some(window) = self.state.window_manager.get_window(hwnd) {
-            if window.state == WindowState::Tiling {
-                // User moved a tiled window -- float it
-                info!("User moved tiled window {:?} -- converting to float", hwnd);
-                drop(window);
-                self.state.window_manager.toggle_float(hwnd);
+        if let Some(window) = self.state.window_manager.get_window(hwnd)
+            && window.state == WindowState::Tiling
+        {
+            // User moved a tiled window -- float it
+            info!("User moved tiled window {:?} -- converting to float", hwnd);
+            let _ = window;
+            self.state.window_manager.toggle_float(hwnd);
 
-                if let Some((monitor_id, _)) =
-                    self.state.workspace_manager.get_window_location(hwnd)
-                {
-                    self.state.apply_layout(monitor_id);
-                }
+            if let Some((monitor_id, _)) = self.state.workspace_manager.get_window_location(hwnd) {
+                self.state.apply_layout(monitor_id);
             }
         }
     }
@@ -793,21 +790,19 @@ impl App {
     fn handle_window_resized(&mut self, hwnd: WindowId) {
         debug!("Window resized: {:?}", hwnd);
 
-        if let Some(window) = self.state.window_manager.get_window(hwnd) {
-            if window.state == WindowState::Tiling {
-                // User resized a tiled window -- float it
-                info!(
-                    "User resized tiled window {:?} -- converting to float",
-                    hwnd
-                );
-                drop(window);
-                self.state.window_manager.toggle_float(hwnd);
+        if let Some(window) = self.state.window_manager.get_window(hwnd)
+            && window.state == WindowState::Tiling
+        {
+            // User resized a tiled window -- float it
+            info!(
+                "User resized tiled window {:?} -- converting to float",
+                hwnd
+            );
+            let _ = window;
+            self.state.window_manager.toggle_float(hwnd);
 
-                if let Some((monitor_id, _)) =
-                    self.state.workspace_manager.get_window_location(hwnd)
-                {
-                    self.state.apply_layout(monitor_id);
-                }
+            if let Some((monitor_id, _)) = self.state.workspace_manager.get_window_location(hwnd) {
+                self.state.apply_layout(monitor_id);
             }
         }
     }
@@ -918,39 +913,39 @@ impl App {
             other => {
                 // Check for workspace_N and move_to_workspace_N patterns.
                 // Key "0" maps to workspace 10 for ergonomic 1-0 key row access.
-                if let Some(rest) = other.strip_prefix("workspace_") {
-                    if let Ok(id) = rest.parse::<u32>() {
-                        let id = if id == 0 { 10 } else { id };
-                        let max_ws = self
-                            .state
-                            .config
-                            .read()
-                            .map(|c| c.workspaces.count)
-                            .unwrap_or(10);
-                        let clamped = id.clamp(1, max_ws);
-                        if clamped != id {
-                            warn!("Workspace ID {} out of range, clamped to {}", id, clamped);
-                        }
-                        self.switch_workspace(clamped);
-                        return Ok(());
+                if let Some(rest) = other.strip_prefix("workspace_")
+                    && let Ok(id) = rest.parse::<u32>()
+                {
+                    let id = if id == 0 { 10 } else { id };
+                    let max_ws = self
+                        .state
+                        .config
+                        .read()
+                        .map(|c| c.workspaces.count)
+                        .unwrap_or(10);
+                    let clamped = id.clamp(1, max_ws);
+                    if clamped != id {
+                        warn!("Workspace ID {} out of range, clamped to {}", id, clamped);
                     }
+                    self.switch_workspace(clamped);
+                    return Ok(());
                 }
-                if let Some(rest) = other.strip_prefix("move_to_workspace_") {
-                    if let Ok(id) = rest.parse::<u32>() {
-                        let id = if id == 0 { 10 } else { id };
-                        let max_ws = self
-                            .state
-                            .config
-                            .read()
-                            .map(|c| c.workspaces.count)
-                            .unwrap_or(10);
-                        let clamped = id.clamp(1, max_ws);
-                        if clamped != id {
-                            warn!("Workspace ID {} out of range, clamped to {}", id, clamped);
-                        }
-                        self.move_to_workspace(clamped);
-                        return Ok(());
+                if let Some(rest) = other.strip_prefix("move_to_workspace_")
+                    && let Ok(id) = rest.parse::<u32>()
+                {
+                    let id = if id == 0 { 10 } else { id };
+                    let max_ws = self
+                        .state
+                        .config
+                        .read()
+                        .map(|c| c.workspaces.count)
+                        .unwrap_or(10);
+                    let clamped = id.clamp(1, max_ws);
+                    if clamped != id {
+                        warn!("Workspace ID {} out of range, clamped to {}", id, clamped);
                     }
+                    self.move_to_workspace(clamped);
+                    return Ok(());
                 }
                 warn!("Unknown hotkey action: {}", other);
                 Err(anyhow::anyhow!("Unknown action: {}", other))
@@ -1006,17 +1001,16 @@ impl App {
         // Use the workspace manager's cycle_focus for basic cycling
         self.state
             .workspace_manager
-            .cycle_focus(monitor_id, direction.clone());
+            .cycle_focus(monitor_id, direction);
 
         // Focus the window that is now focused in the workspace
         if let Some(ws) = self
             .state
             .workspace_manager
             .get_active_workspace(monitor_id)
+            && let Some(focused) = ws.focused_window
         {
-            if let Some(focused) = ws.focused_window {
-                focus_window(focused.as_raw());
-            }
+            focus_window(focused.as_raw());
         }
 
         // Re-apply layout to update border colors
@@ -1112,10 +1106,9 @@ impl App {
                 .state
                 .workspace_manager
                 .get_active_workspace(current_monitor_id)
+                && let Some(focused) = ws.focused_window
             {
-                if let Some(focused) = ws.focused_window {
-                    focus_window(focused.as_raw());
-                }
+                focus_window(focused.as_raw());
             }
             self.state.apply_layout(current_monitor_id);
         }
@@ -1140,10 +1133,10 @@ impl App {
             for ws in &mon_ws.workspaces {
                 let visible = ws.id == id;
                 for &win_id in &ws.windows {
-                    if let Some(window) = self.state.window_manager.get_window(win_id) {
-                        if window.is_visible_and_managed() {
-                            show_window(win_id.as_raw(), visible);
-                        }
+                    if let Some(window) = self.state.window_manager.get_window(win_id)
+                        && window.is_visible_and_managed()
+                    {
+                        show_window(win_id.as_raw(), visible);
                     }
                 }
             }
@@ -1212,7 +1205,7 @@ impl App {
                 "Cycled layout on monitor {} to {:?}",
                 monitor_id, new_layout
             );
-            drop(ws);
+            let _ = ws;
             self.state.apply_layout(monitor_id);
         }
     }
@@ -1245,7 +1238,7 @@ impl App {
                         "Resized master-stack split on monitor {} to {:.2}",
                         monitor_id, new_ratio
                     );
-                    drop(ws);
+                    let _ = ws;
                     self.state.apply_layout(monitor_id);
                 }
             }
@@ -1261,7 +1254,7 @@ impl App {
                     // resize_increase/resize_decrease can target specific splits
                     // based on the focused window. For now we adjust the default
                     // ratio used when new splits are created.
-                    drop(ws);
+                    let _ = ws;
                     self.state.apply_layout(monitor_id);
                 }
             }
@@ -1405,6 +1398,10 @@ fn weighted_directional_distance(from: (i32, i32), to: (i32, i32), dir: &FocusDi
             } else {
                 dx.abs() + dy * 2.0
             }
+        }
+        FocusDirection::Next | FocusDirection::Previous => {
+            // For Next/Previous, use simple distance (no directional bias)
+            (dx * dx + dy * dy).sqrt()
         }
     }
 }

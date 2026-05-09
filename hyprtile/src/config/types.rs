@@ -92,19 +92,15 @@ impl Default for GeneralConfig {
 }
 
 /// Modifier keys used for keybind combinations.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "UPPERCASE")]
+#[derive(Default)]
 pub enum ModKey {
+    #[default]
     Alt,
     Win,
     Ctrl,
     Shift,
-}
-
-impl Default for ModKey {
-    fn default() -> Self {
-        ModKey::Alt
-    }
 }
 
 /// Gap configuration for tiled windows.

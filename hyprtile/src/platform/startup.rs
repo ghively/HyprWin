@@ -31,7 +31,7 @@ use windows::Win32::System::Registry::{
     RegQueryValueExW,
     RegSetValueExW,
 };
-use windows::core::{HSTRING, PCWSTR, w};
+use windows::core::{PCWSTR, w};
 
 // HRESULT for ERROR_FILE_NOT_FOUND (Win32 error 2 -> 0x80070002)
 const HRESULT_ERROR_FILE_NOT_FOUND: u32 = 0x80070002;
@@ -66,27 +66,24 @@ pub fn enable_auto_start() -> anyhow::Result<()> {
             &mut hkey,
             None,
         );
-        result.map_err(|e| anyhow::anyhow!("Failed to create/open Run registry key: {}", e))?;
+        result
+            .ok()
+            .map_err(|e| anyhow::anyhow!("Failed to create/open Run registry key: {}", e))?;
 
-        let path_wide = HSTRING::from(&path_str);
-        let path_bytes = path_wide.as_wide();
-        // REG_SZ value includes the null terminator in the byte count
-        let byte_len = (path_bytes.len() * std::mem::size_of::<u16>()) as u32;
-
-        let result = RegSetValueExW(
-            hkey,
-            VALUE_NAME,
-            None,
-            REG_SZ,
-            Some(std::slice::from_raw_parts(
-                path_bytes.as_ptr() as *const u8,
-                byte_len as usize,
-            )),
+        // Convert path to wide string including null terminator
+        let path_wide: Vec<u16> = path_str.encode_utf16().chain(std::iter::once(0)).collect();
+        let path_bytes = std::slice::from_raw_parts(
+            path_wide.as_ptr() as *const u8,
+            path_wide.len() * std::mem::size_of::<u16>(),
         );
+
+        let result = RegSetValueExW(hkey, VALUE_NAME, None, REG_SZ, Some(path_bytes));
 
         let _ = RegCloseKey(hkey);
 
-        result.map_err(|e| anyhow::anyhow!("Failed to write auto-start registry value: {}", e))?;
+        result
+            .ok()
+            .map_err(|e| anyhow::anyhow!("Failed to write auto-start registry value: {}", e))?;
     }
 
     info!("Auto-start enabled successfully");
@@ -110,12 +107,14 @@ pub fn disable_auto_start() -> anyhow::Result<()> {
             KEY_SET_VALUE,
             &mut hkey,
         );
-        result.map_err(|e| anyhow::anyhow!("Failed to open Run registry key: {}", e))?;
+        result
+            .ok()
+            .map_err(|e| anyhow::anyhow!("Failed to open Run registry key: {}", e))?;
 
         let result = RegDeleteValueW(hkey, VALUE_NAME);
         let _ = RegCloseKey(hkey);
 
-        match result {
+        match result.ok() {
             Ok(()) => {
                 info!("Auto-start disabled successfully");
                 Ok(())
@@ -148,7 +147,7 @@ pub fn is_auto_start_enabled() -> bool {
         }
     };
 
-    match get_registry_value() {
+    match unsafe { get_registry_value() } {
         Ok(Some(value)) => {
             // The registry value may be quoted and may contain trailing nulls
             let trimmed = value.trim().trim_matches('"').trim_end_matches('\0');
@@ -187,23 +186,28 @@ fn get_executable_path() -> anyhow::Result<PathBuf> {
 /// not exist, or an error if the registry could not be read.
 unsafe fn get_registry_value() -> anyhow::Result<Option<String>> {
     let mut hkey = HKEY::default();
-    let result = RegOpenKeyExW(HKEY_CURRENT_USER, RUN_KEY_PATH, None, KEY_READ, &mut hkey);
-    result.map_err(|e| anyhow::anyhow!("Failed to open Run registry key for reading: {}", e))?;
+    let result =
+        unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, RUN_KEY_PATH, None, KEY_READ, &mut hkey) };
+    result
+        .ok()
+        .map_err(|e| anyhow::anyhow!("Failed to open Run registry key for reading: {}", e))?;
 
     // First query to get the required buffer size
     let mut data_type = 0u32;
     let mut data_len: u32 = 0;
-    let result = RegQueryValueExW(
-        hkey,
-        VALUE_NAME,
-        None,
-        Some(&mut data_type),
-        None,
-        Some(&mut data_len),
-    );
+    let result = unsafe {
+        RegQueryValueExW(
+            hkey,
+            VALUE_NAME,
+            None,
+            Some(&mut data_type as *mut u32 as *mut _),
+            None,
+            Some(&mut data_len),
+        )
+    };
 
-    if let Err(e) = result {
-        let _ = RegCloseKey(hkey);
+    if let Err(e) = result.ok() {
+        let _ = unsafe { RegCloseKey(hkey) };
         if e.code().0 as u32 == HRESULT_ERROR_FILE_NOT_FOUND {
             return Ok(None);
         }
@@ -215,18 +219,22 @@ unsafe fn get_registry_value() -> anyhow::Result<Option<String>> {
 
     // Allocate buffer and read the value
     let mut buffer: Vec<u8> = vec![0; data_len as usize];
-    let result = RegQueryValueExW(
-        hkey,
-        VALUE_NAME,
-        None,
-        Some(&mut data_type),
-        Some(buffer.as_mut_ptr()),
-        Some(&mut data_len),
-    );
+    let result = unsafe {
+        RegQueryValueExW(
+            hkey,
+            VALUE_NAME,
+            None,
+            Some(&mut data_type as *mut u32 as *mut _),
+            Some(buffer.as_mut_ptr()),
+            Some(&mut data_len),
+        )
+    };
 
-    let _ = RegCloseKey(hkey);
+    let _ = unsafe { RegCloseKey(hkey) };
 
-    result.map_err(|e| anyhow::anyhow!("Failed to read auto-start registry value: {}", e))?;
+    result
+        .ok()
+        .map_err(|e| anyhow::anyhow!("Failed to read auto-start registry value: {}", e))?;
 
     if data_type != REG_SZ.0 {
         return Err(anyhow::anyhow!(
@@ -236,10 +244,12 @@ unsafe fn get_registry_value() -> anyhow::Result<Option<String>> {
     }
 
     // Convert UTF-16 bytes to a Rust string
-    let wide_slice = std::slice::from_raw_parts(
-        buffer.as_ptr() as *const u16,
-        buffer.len() / std::mem::size_of::<u16>(),
-    );
+    let wide_slice = unsafe {
+        std::slice::from_raw_parts(
+            buffer.as_ptr() as *const u16,
+            buffer.len() / std::mem::size_of::<u16>(),
+        )
+    };
     let value = String::from_utf16_lossy(wide_slice);
 
     Ok(Some(value))
@@ -257,10 +267,7 @@ mod tests {
     fn test_get_executable_path() {
         let path = get_executable_path();
         assert!(path.is_ok(), "Should be able to get executable path");
-        let path = match path {
-            Ok(p) => p,
-            Err(_) => return false,
-        };
+        let path = path.unwrap();
         assert!(path.is_absolute(), "Executable path should be absolute");
     }
 

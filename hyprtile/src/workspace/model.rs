@@ -201,8 +201,12 @@ impl Workspace {
         };
 
         let window = self.windows.remove(from_idx);
-        // Adjust target index if removal shifted it.
-        let insert_idx = if from_idx < to_idx { to_idx } else { to_idx };
+        // After removing from_idx, to_idx may shift if from_idx < to_idx.
+        let insert_idx = if from_idx < to_idx {
+            to_idx.saturating_sub(1)
+        } else {
+            to_idx
+        };
         self.windows.insert(insert_idx, window);
 
         // Update focused window pointer if it was the moved window.

@@ -1,11 +1,12 @@
 use std::mem;
 use std::path::Path;
 use tracing::{debug, trace, warn};
-use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE};
+use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE, WPARAM};
 use windows::Win32::Graphics::Dwm::{
     DWM_CLOAKED_SHELL, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS, DwmGetWindowAttribute,
 };
-use windows::Win32::System::Threading::GetProcessImageFileNameW;
+use windows::Win32::System::ProcessStatus::GetProcessImageFileNameW;
+use windows::Win32::UI::Input::KeyboardAndMouse::{SetActiveWindow, SetFocus};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 use crate::util::rect::Rect;
@@ -26,82 +27,82 @@ pub struct WindowId(pub isize);
 impl WindowId {
     /// Convert to a raw Win32 HWND.
     pub fn as_raw(&self) -> HWND {
-        HWND(self.0)
+        HWND(self.0 as *mut _)
     }
 
     /// Create a WindowId from a raw Win32 HWND.
     pub fn from_raw(hwnd: HWND) -> Self {
-        Self(hwnd.0)
+        Self(hwnd.0 as isize)
     }
 
     /// Check if the window handle is valid and still exists.
     pub fn is_valid(&self) -> bool {
-        let hwnd = HWND(self.0);
-        !hwnd.is_invalid() && unsafe { IsWindow(hwnd).as_bool() }
+        let hwnd = HWND(self.0 as *mut _);
+        !hwnd.is_invalid() && unsafe { IsWindow(Some(hwnd)).as_bool() }
     }
 
     /// Check if the window is visible.
     pub fn is_visible(&self) -> bool {
-        let hwnd = HWND(self.0);
+        let hwnd = HWND(self.0 as *mut _);
         unsafe { IsWindowVisible(hwnd).as_bool() }
     }
 
     /// Check if the window is minimized (iconic).
     pub fn is_iconic(&self) -> bool {
-        let hwnd = HWND(self.0);
+        let hwnd = HWND(self.0 as *mut _);
         unsafe { IsIconic(hwnd).as_bool() }
     }
 
     /// Check if the window is maximized (zoomed).
     pub fn is_zoomed(&self) -> bool {
-        let hwnd = HWND(self.0);
+        let hwnd = HWND(self.0 as *mut _);
         unsafe { IsZoomed(hwnd).as_bool() }
     }
 
     /// Get the window rectangle including borders.
     pub fn get_rect(&self) -> Option<Rect> {
-        get_window_rect(HWND(self.0))
+        get_window_rect(HWND(self.0 as *mut _))
     }
 
     /// Get the window title text.
     pub fn get_title(&self) -> String {
-        get_window_text(HWND(self.0))
+        get_window_text(HWND(self.0 as *mut _))
     }
 
     /// Get the window class name.
     pub fn get_class_name(&self) -> String {
-        get_class_name_for_window(HWND(self.0))
+        get_class_name_for_window(HWND(self.0 as *mut _))
     }
 
     /// Get the process name (EXE filename) of the window.
     pub fn get_process_name(&self) -> String {
-        get_window_process_name(HWND(self.0))
+        get_window_process_name(HWND(self.0 as *mut _))
     }
 
     /// Check if the window is cloaked (hidden by DWM).
     pub fn is_cloaked(&self) -> bool {
-        is_window_cloaked(HWND(self.0))
+        is_window_cloaked(HWND(self.0 as *mut _))
     }
 
     /// Check if the window is a UWP host (ApplicationFrameHost.exe).
     pub fn is_uwp_host(&self) -> bool {
-        is_uwp_host_window(HWND(self.0))
+        is_uwp_host_window(HWND(self.0 as *mut _))
     }
 
     /// Check if the window is a tool window (no taskbar button).
     pub fn is_tool_window(&self) -> bool {
-        let ex_style = get_window_ex_style(HWND(self.0));
+        let ex_style = get_window_ex_style(HWND(self.0 as *mut _));
         ex_style.contains(WS_EX_TOOLWINDOW)
     }
 
     /// Check if this window should be managed by the tiling WM.
     pub fn should_manage(&self) -> bool {
-        should_manage_window(HWND(self.0))
+        should_manage_window(HWND(self.0 as *mut _))
     }
 }
 
 /// Default flags for SetWindowPos tiling operations.
-pub const SET_WINDOW_POS_FLAGS: SET_WINDOW_POS_FLAGS = SET_WINDOW_POS_FLAGS(
+pub const DEFAULT_SET_WINDOW_POS_FLAGS: SET_WINDOW_POS_FLAGS = SET_WINDOW_POS_FLAGS(
     SWP_NOACTIVATE.0
         | SWP_FRAMECHANGED.0
         | SWP_NOSENDCHANGING.0
@@ -112,7 +113,7 @@ pub const SET_WINDOW_POS_FLAGS: SET_WINDOW_POS_FLAGS = SET_WINDOW_POS_FLAGS(
 
 /// Check if a window should be managed by the tiling WM.
 pub fn should_manage_window(hwnd: HWND) -> bool {
-    if hwnd.is_invalid() || !unsafe { IsWindow(hwnd).as_bool() } {
+    if hwnd.is_invalid() || !unsafe { IsWindow(Some(hwnd)).as_bool() } {
         return false;
     }
 
@@ -285,7 +286,7 @@ pub fn set_window_pos(hwnd: HWND, rect: &Rect, flags: SET_WINDOW_POS_FLAGS) {
         );
         let _ = SetWindowPos(
             hwnd,
-            HWND(0),
+            None,
             rect.x,
             rect.y,
             rect.width,
@@ -304,12 +305,12 @@ impl DeferredPositioner {
     /// Begin a deferred window positioning batch for `count` windows.
     pub fn new(count: i32) -> Self {
         unsafe {
-            let hdwp = BeginDeferWindowPos(count);
-            if hdwp.is_invalid() {
-                warn!("BeginDeferWindowPos failed");
-                Self { hdwp: None }
-            } else {
-                Self { hdwp: Some(hdwp) }
+            match BeginDeferWindowPos(count) {
+                Ok(hdwp) => Self { hdwp: Some(hdwp) },
+                Err(_) => {
+                    warn!("BeginDeferWindowPos failed");
+                    Self { hdwp: None }
+                }
             }
         }
     }
@@ -336,23 +337,25 @@ impl DeferredPositioner {
         );
 
         unsafe {
-            let new_hdwp = DeferWindowPos(
+            match DeferWindowPos(
                 hdwp,
                 hwnd,
-                HWND(0),
+                None,
                 rect.x,
                 rect.y,
                 rect.width,
                 rect.height,
                 flags_to_use,
-            );
-            if new_hdwp.is_invalid() {
-                warn!("DeferWindowPos failed for hwnd={:?}", hwnd);
-                self.hdwp = None;
-                false
-            } else {
-                self.hdwp = Some(new_hdwp);
-                true
+            ) {
+                Ok(new_hdwp) => {
+                    self.hdwp = Some(new_hdwp);
+                    true
+                }
+                Err(_) => {
+                    warn!("DeferWindowPos failed for hwnd={:?}", hwnd);
+                    self.hdwp = None;
+                    false
+                }
             }
         }
     }
@@ -361,10 +364,7 @@ impl DeferredPositioner {
     /// Returns true on success.
     pub fn commit(self) -> bool {
         match self.hdwp {
-            Some(hdwp) => {
-                let result = unsafe { EndDeferWindowPos(hdwp) };
-                result.as_bool()
-            }
+            Some(hdwp) => unsafe { EndDeferWindowPos(hdwp).is_ok() },
             None => false,
         }
     }
@@ -429,7 +429,7 @@ pub fn remove_thick_frame(hwnd: HWND) {
     unsafe {
         let _ = SetWindowPos(
             hwnd,
-            HWND(0),
+            None,
             0,
             0,
             0,
@@ -466,7 +466,7 @@ pub fn restore_thick_frame(hwnd: HWND) {
     unsafe {
         let _ = SetWindowPos(
             hwnd,
-            HWND(0),
+            None,
             0,
             0,
             0,
@@ -490,7 +490,7 @@ pub fn close_window(hwnd: HWND) {
     }
     debug!("Closing window {:?}", hwnd);
     unsafe {
-        let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+        let _ = PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
     }
 }
 
@@ -504,7 +504,7 @@ pub fn focus_window(hwnd: HWND) {
             let _ = ShowWindowAsync(hwnd, SW_RESTORE);
         }
         let _ = SetForegroundWindow(hwnd);
-        let _ = SetFocus(hwnd);
+        let _ = SetFocus(Some(hwnd));
         let _ = SetActiveWindow(hwnd);
     }
 }
@@ -611,9 +611,7 @@ fn get_window_process_name(hwnd: HWND) -> String {
     }
 
     use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::System::Threading::{
-        GetWindowThreadProcessId, OpenProcess, PROCESS_QUERY_INFORMATION,
-    };
+    use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION};
 
     let mut pid = 0u32;
     unsafe {

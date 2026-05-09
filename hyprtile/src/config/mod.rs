@@ -16,7 +16,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use notify::{Config as NotifyConfig, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use tracing::{error, info, warn};
 
 use types::*;
@@ -26,7 +26,7 @@ use types::*;
 ///
 /// # Usage
 ///
-/// ```
+/// ```ignore
 /// let manager = ConfigManager::new()?;
 /// let config = manager.get()?;
 /// // use config...
@@ -128,7 +128,7 @@ impl ConfigManager {
     ///
     /// Returns `PoisonError` if the lock is poisoned (a writer panicked
     /// while holding the lock).
-    pub fn get(&self) -> std::sync::LockResult<std::sync::RwLockReadGuard<Config>> {
+    pub fn get(&self) -> std::sync::LockResult<std::sync::RwLockReadGuard<'_, Config>> {
         self.config.read()
     }
 
@@ -303,29 +303,29 @@ impl ConfigManager {
                 ));
             }
 
-            if let Some(ref class) = rule.match_class {
-                if class.is_empty() {
-                    issues.push(format!(
-                        "window_rules[{}].match_class is an empty string",
-                        idx
-                    ));
-                }
+            if let Some(ref class) = rule.match_class
+                && class.is_empty()
+            {
+                issues.push(format!(
+                    "window_rules[{}].match_class is an empty string",
+                    idx
+                ));
             }
-            if let Some(ref title) = rule.match_title {
-                if title.is_empty() {
-                    issues.push(format!(
-                        "window_rules[{}].match_title is an empty string",
-                        idx
-                    ));
-                }
+            if let Some(ref title) = rule.match_title
+                && title.is_empty()
+            {
+                issues.push(format!(
+                    "window_rules[{}].match_title is an empty string",
+                    idx
+                ));
             }
-            if let Some(ref process) = rule.match_process {
-                if process.is_empty() {
-                    issues.push(format!(
-                        "window_rules[{}].match_process is an empty string",
-                        idx
-                    ));
-                }
+            if let Some(ref process) = rule.match_process
+                && process.is_empty()
+            {
+                issues.push(format!(
+                    "window_rules[{}].match_process is an empty string",
+                    idx
+                ));
             }
         }
 

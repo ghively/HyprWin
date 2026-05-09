@@ -126,7 +126,7 @@ impl Node {
             Node::Split {
                 left,
                 right,
-                direction: ref mut dir,
+                direction: dir,
                 ..
             } => {
                 *dir = direction;
@@ -160,25 +160,24 @@ impl Node {
                 }
             }
             Node::Empty => false,
-            Node::Split {
-                left,
-                right,
-                direction: dir,
-                ratio: rat,
-            } => {
+            Node::Split { left, right, .. } => {
                 let left_removed = left.remove_window(window_id);
                 if left_removed {
-                    // Promote the right child to replace this split node.
-                    let right_node = std::mem::replace(right.as_mut(), Node::Empty);
-                    *self = right_node;
+                    // Only collapse if the left child is now empty (was a leaf).
+                    if matches!(left.as_ref(), Node::Empty) {
+                        let right_node = std::mem::replace(right.as_mut(), Node::Empty);
+                        *self = right_node;
+                    }
                     return true;
                 }
 
                 let right_removed = right.remove_window(window_id);
                 if right_removed {
-                    // Promote the left child to replace this split node.
-                    let left_node = std::mem::replace(left.as_mut(), Node::Empty);
-                    *self = left_node;
+                    // Only collapse if the right child is now empty (was a leaf).
+                    if matches!(right.as_ref(), Node::Empty) {
+                        let left_node = std::mem::replace(left.as_mut(), Node::Empty);
+                        *self = left_node;
+                    }
                     return true;
                 }
 
@@ -231,15 +230,13 @@ impl Node {
 
     /// Rebalance all split ratios in this subtree to exactly 0.5.
     pub fn rebalance_ratios(&mut self) {
-        match self {
-            Node::Split {
-                ratio, left, right, ..
-            } => {
-                *ratio = 0.5;
-                left.rebalance_ratios();
-                right.rebalance_ratios();
-            }
-            _ => {}
+        if let Node::Split {
+            ratio, left, right, ..
+        } = self
+        {
+            *ratio = 0.5;
+            left.rebalance_ratios();
+            right.rebalance_ratios();
         }
     }
 
@@ -298,7 +295,7 @@ impl Node {
     pub fn adjust_ratio(&mut self, point: (i32, i32), delta: f64) -> bool {
         match self {
             Node::Split {
-                direction,
+                direction: _,
                 ratio,
                 left,
                 right,

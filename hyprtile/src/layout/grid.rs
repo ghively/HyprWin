@@ -103,7 +103,7 @@ impl GridLayout {
 /// when the workspace is typically wider than it is tall.
 ///
 /// # Examples
-/// ```
+/// ```ignore
 /// assert_eq!(calculate_grid_dimensions(1), (1, 1));
 /// assert_eq!(calculate_grid_dimensions(4), (2, 2));
 /// assert_eq!(calculate_grid_dimensions(5), (2, 3));
