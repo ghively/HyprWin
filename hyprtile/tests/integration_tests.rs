@@ -17,8 +17,6 @@
 
 #![allow(dead_code)]
 
-use std::collections::HashMap;
-
 // Import the hyprtile library modules
 use hyprtile::config::defaults::default_config;
 use hyprtile::config::types::*;
@@ -33,9 +31,7 @@ use hyprtile::layout::*;
 use hyprtile::util::animation::*;
 use hyprtile::util::rect::Rect;
 use hyprtile::window::model::*;
-use hyprtile::window::rules::{
-    RuleEngine, class_matches, process_matches, title_matches, window_matches_rule,
-};
+use hyprtile::window::rules::{RuleEngine, class_matches, process_matches, title_matches};
 use hyprtile::workspace::model::*;
 
 // ============================================================================
